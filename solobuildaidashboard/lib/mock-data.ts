@@ -20,12 +20,7 @@ export interface Agent {
 }
 
 export const agents: Agent[] = [
-  { id: "a1", name: "Sarah Mitchell", gender: "Female", status: "Active", totalCalls: 0 },
-  { id: "a2", name: "James Rodriguez", gender: "Male", status: "Active", totalCalls: 0 },
-  { id: "a3", name: "Emily Chen", gender: "Female", status: "Busy", totalCalls: 0 },
-  { id: "a4", name: "Michael Brooks", gender: "Male", status: "Active", totalCalls: 0 },
-  { id: "a5", name: "Priya Sharma", gender: "Female", status: "Inactive", totalCalls: 0 },
-  { id: "a6", name: "David Kim", gender: "Male", status: "Active", totalCalls: 0 },
+  { id: "a1", name: "Yash", gender: "Male", status: "Active", totalCalls: 0 },
 ];
 
 // Campaign Data
