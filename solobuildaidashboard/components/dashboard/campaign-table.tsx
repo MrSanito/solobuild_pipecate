@@ -32,7 +32,11 @@ function getStatusDot(status: string) {
   }
 }
 
-export function CampaignTable() {
+interface CampaignTableProps {
+  onAddCampaignClick?: () => void;
+}
+
+export function CampaignTable({ onAddCampaignClick }: CampaignTableProps) {
   const { campaigns } = useCampaigns();
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
 
@@ -46,9 +50,20 @@ export function CampaignTable() {
               <CardTitle className="text-[15px] font-semibold text-foreground">Recent Campaigns</CardTitle>
               <CardDescription className="text-xs text-muted-foreground mt-0.5">Active and recent calling campaigns</CardDescription>
             </div>
-            <Button variant="outline" size="sm" className="text-xs h-8 rounded-lg">
-              View All
-            </Button>
+            <div className="flex items-center gap-2">
+              {onAddCampaignClick && (
+                <Button 
+                  onClick={onAddCampaignClick}
+                  size="sm" 
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs h-8 rounded-lg cursor-pointer"
+                >
+                  Add Campaign
+                </Button>
+              )}
+              <Button variant="outline" size="sm" className="text-xs h-8 rounded-lg">
+                View All
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="px-0 pb-0">

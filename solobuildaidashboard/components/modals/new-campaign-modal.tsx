@@ -121,21 +121,29 @@ export function NewCampaignModal({ open, onClose }: NewCampaignModalProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !agentName) return;
+    const trimmedName = name.trim();
+    const trimmedAgentName = agentName.trim();
+    const trimmedPurpose = purpose.trim();
+    const trimmedDescription = description.trim();
+
+    if (!trimmedName || !trimmedAgentName) {
+      alert("Please enter a Campaign Name and select an Assigned Agent.");
+      return;
+    }
 
     const leadsData = uploadedLeads.map(l => ({
-      customerName: l.name,
-      phoneNumber: l.phone,
-      company: l.company,
-      email: l.email,
-      notes: l.notes
+      customerName: l.name.trim(),
+      phoneNumber: l.phone.trim(),
+      company: l.company.trim(),
+      email: l.email.trim(),
+      notes: l.notes.trim()
     }));
 
     addCampaign({
-      name,
-      assignedAgent: agentName,
-      purpose,
-      description: description || `Campaign for ${purpose}`,
+      name: trimmedName,
+      assignedAgent: trimmedAgentName,
+      purpose: trimmedPurpose,
+      description: trimmedDescription || `Campaign for ${trimmedPurpose}`,
       startDate: startDate || new Date().toISOString().split("T")[0],
       endDate: endDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
       status
@@ -152,7 +160,7 @@ export function NewCampaignModal({ open, onClose }: NewCampaignModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="sm:max-w-[620px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[620px] max-h-[90vh] overflow-y-auto bg-card border-border text-foreground">
         <DialogHeader>
           <DialogTitle className="text-foreground">Create New Campaign</DialogTitle>
           <DialogDescription className="text-muted-foreground text-xs">

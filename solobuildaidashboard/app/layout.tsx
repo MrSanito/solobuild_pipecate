@@ -4,6 +4,7 @@ import "./globals.css";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Navbar } from "@/components/layout/navbar";
 import { CampaignProvider } from "@/lib/campaign-store";
+import { AuthWrapper } from "@/components/layout/auth-wrapper";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -22,16 +23,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={`${inter.className} antialiased`}>
         <CampaignProvider>
-          <div className="flex min-h-screen">
-            <Sidebar />
-            <div className="flex-1 pl-64">
-              <Navbar />
-              <main className="p-8 page-enter">{children}</main>
+          <AuthWrapper>
+            <div className="flex min-h-screen">
+              <Sidebar />
+              <div className="flex-1 pl-64">
+                <Navbar />
+                <main className="p-8 page-enter">{children}</main>
+              </div>
             </div>
-          </div>
+          </AuthWrapper>
         </CampaignProvider>
       </body>
     </html>

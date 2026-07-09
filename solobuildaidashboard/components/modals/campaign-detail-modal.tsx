@@ -177,7 +177,7 @@ export function CampaignDetailModal({ campaign, open, onClose }: CampaignDetailM
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="sm:max-w-[620px] max-h-[85vh] flex flex-col p-6">
+      <DialogContent className="sm:max-w-[620px] max-h-[85vh] flex flex-col p-6 bg-card border-border text-foreground">
         <DialogHeader className="mb-2 shrink-0">
           <div className="flex items-center justify-between">
             <DialogTitle className="text-foreground text-[16px] font-semibold">{campaign.name}</DialogTitle>
@@ -345,6 +345,7 @@ export function CampaignDetailModal({ campaign, open, onClose }: CampaignDetailM
                           <TableHead className="text-xs py-2 h-9">Company</TableHead>
                           <TableHead className="text-xs py-2 h-9">Phone Number</TableHead>
                           <TableHead className="text-xs py-2 h-9">Status</TableHead>
+                          <TableHead className="text-xs py-2 h-9 w-[60px] text-right">Action</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -364,6 +365,37 @@ export function CampaignDetailModal({ campaign, open, onClose }: CampaignDetailM
                                 <span className={`mr-1 inline-block h-1 w-1 rounded-full ${getCallStatusDot(lead.status)}`} />
                                 {lead.status}
                               </Badge>
+                            </TableCell>
+                            <TableCell className="py-2 text-right">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 p-0 text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg cursor-pointer"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  try {
+                                    const response = await fetch("/api/call/initiate", {
+                                      method: "POST",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({
+                                        phoneNumber: lead.phoneNumber,
+                                        name: lead.customerName,
+                                        leadId: lead.id,
+                                      }),
+                                    });
+                                    if (response.ok) {
+                                      alert(`Call triggered successfully to ${lead.customerName}!`);
+                                    } else {
+                                      const data = await response.json();
+                                      alert(`Failed to trigger call: ${data.error}`);
+                                    }
+                                  } catch (err: any) {
+                                    alert(`Error: ${err.message}`);
+                                  }
+                                }}
+                              >
+                                <Phone className="h-3.5 w-3.5" />
+                              </Button>
                             </TableCell>
                           </TableRow>
                         ))}

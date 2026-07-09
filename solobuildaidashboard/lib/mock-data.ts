@@ -56,6 +56,7 @@ export interface CallLog {
   callDate: string;
   transcript: string;
   summary: string;
+  recordingPath?: string;
 }
 
 export const callLogs: CallLog[] = [];

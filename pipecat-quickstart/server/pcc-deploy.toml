@@ -1,6 +1,6 @@
-agent_name = "rentopus"
-secret_set = "rentopuskeytwo"
+agent_name = "quickstart-agent"
+secret_set = "quickstart-agent-secrets"
 agent_profile = "agent-1x"
 
 [scaling]
-	min_agents = 1
+min_agents = 1

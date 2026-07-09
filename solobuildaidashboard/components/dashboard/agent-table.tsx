@@ -30,7 +30,11 @@ function getStatusVariant(status: string) {
   }
 }
 
-export function AgentTable() {
+interface AgentTableProps {
+  onAddAgentClick?: () => void;
+}
+
+export function AgentTable({ onAddAgentClick }: AgentTableProps) {
   return (
     <Card className="border-border bg-card">
       <CardHeader>
@@ -39,9 +43,16 @@ export function AgentTable() {
             <CardTitle className="text-[15px] font-semibold text-foreground">Agent Performance</CardTitle>
             <CardDescription className="text-xs text-muted-foreground mt-0.5">Your AI voice agents overview</CardDescription>
           </div>
-          <Button variant="outline" size="sm" className="text-xs h-8 rounded-lg">
-            View All
-          </Button>
+          <div className="flex items-center gap-2">
+            {onAddAgentClick && (
+              <Button onClick={onAddAgentClick} size="sm" className="text-xs h-8 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg gap-1.5 cursor-pointer">
+                Add Agent
+              </Button>
+            )}
+            <Button variant="outline" size="sm" className="text-xs h-8 rounded-lg">
+              View All
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="px-0 pb-0">

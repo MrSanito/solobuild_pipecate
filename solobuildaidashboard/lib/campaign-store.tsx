@@ -16,6 +16,7 @@ interface CampaignContextType {
     leads: { customerName: string; phoneNumber: string; company?: string }[]
   ) => void;
   importCampaigns: (newCampaigns: Omit<Campaign, "id" | "stats">[]) => void;
+  refreshCallLogs: () => Promise<void>;
 }
 
 const CampaignContext = createContext<CampaignContextType | undefined>(undefined);
@@ -25,6 +26,35 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
   const [callLogs, setCallLogs] = useState<CallLog[]>([]);
   const [agents, setAgents] = useState<Agent[]>(initialAgents);
   const [initialized, setInitialized] = useState(false);
+
+  // Method to refresh logs from MongoDB
+  const refreshCallLogs = async () => {
+    try {
+      const res = await fetch("/api/call");
+      if (res.ok) {
+        const dbLogs = await res.json();
+        if (Array.isArray(dbLogs)) {
+          // Merge MongoDB database logs with mock logs (placing database calls first)
+          const savedLogs = localStorage.getItem("voiceai_call_logs");
+          const localLogs = savedLogs ? JSON.parse(savedLogs) : initialCallLogs;
+          
+          const combined = [...dbLogs];
+          const dbIds = new Set(dbLogs.map((log: any) => log.id));
+          
+          localLogs.forEach((log: any) => {
+            if (!dbIds.has(log.id)) {
+              combined.push(log);
+            }
+          });
+          
+          setCallLogs(combined);
+          return;
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load logs from database:", err);
+    }
+  };
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -41,16 +71,13 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
       setCampaigns(initialCampaigns);
     }
 
-    if (savedLogs) {
-      try {
-        setCallLogs(JSON.parse(savedLogs));
-      } catch (e) {
-        setCallLogs(initialCallLogs);
-      }
-    } else {
-      setCallLogs(initialCallLogs);
-    }
-    setInitialized(true);
+    // Attempt to load from database first, otherwise load from local storage
+    const loadInitialLogs = async () => {
+      await refreshCallLogs();
+      setInitialized(true);
+    };
+    
+    loadInitialLogs();
   }, []);
 
   // Save to localStorage when state changes
@@ -153,7 +180,7 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <CampaignContext.Provider value={{ campaigns, callLogs, agents, addCampaign, addLeadsToCampaign, importCampaigns }}>
+    <CampaignContext.Provider value={{ campaigns, callLogs, agents, addCampaign, addLeadsToCampaign, importCampaigns, refreshCallLogs }}>
       {children}
     </CampaignContext.Provider>
   );

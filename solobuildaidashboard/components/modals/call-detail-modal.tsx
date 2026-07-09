@@ -94,12 +94,26 @@ export function CallDetailModal({ call, open, onClose }: CallDetailModalProps) {
           <div>
             <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">Audio Recording</p>
             <div className="rounded-xl border border-border bg-muted/50 p-4">
-              <audio controls className="w-full h-8" preload="none">
-                <source src="" type="audio/mpeg" />
-              </audio>
-              <p className="mt-2 text-[11px] text-muted-foreground text-center">
-                Sample audio — no recording available in demo
-              </p>
+              {call.recordingPath ? (
+                <>
+                  <audio key={call.recordingPath} controls className="w-full h-8" preload="metadata">
+                    <source src={call.recordingPath} type="audio/wav" />
+                    Your browser does not support the audio element.
+                  </audio>
+                  <p className="mt-2 text-[11px] text-emerald-400 text-center font-medium">
+                    Outbound conversation recording available
+                  </p>
+                </>
+              ) : (
+                <>
+                  <audio controls className="w-full h-8 opacity-40" preload="none">
+                    <source src="" type="audio/mpeg" />
+                  </audio>
+                  <p className="mt-2 text-[11px] text-muted-foreground text-center">
+                    No recording available for this call
+                  </p>
+                </>
+              )}
             </div>
           </div>
 
