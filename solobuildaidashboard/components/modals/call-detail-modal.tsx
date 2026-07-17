@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import {
   User, Building2, Phone, Calendar, Clock, Bot, Megaphone, Download, Sparkles,
 } from "lucide-react";
@@ -48,6 +49,53 @@ const infoFields = [
 ];
 
 export function CallDetailModal({ call, open, onClose }: CallDetailModalProps) {
+  const [audioSrc, setAudioSrc] = useState<string>("");
+  const [providerLabel, setProviderLabel] = useState<"Cloudinary" | "Vobiz" | "Local" | "">("");
+  const [hasError, setHasError] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (call) {
+      if (call.recordingCloudinaryUrl) {
+        setAudioSrc(call.recordingCloudinaryUrl);
+        setProviderLabel("Cloudinary");
+      } else if (call.recordingPath) {
+        setAudioSrc(call.recordingPath);
+        setProviderLabel(call.recordingPath.startsWith("http") ? "Vobiz" : "Local");
+      } else if (call.recordingVobizUrl) {
+        setAudioSrc(call.recordingVobizUrl);
+        setProviderLabel("Vobiz");
+      } else {
+        setAudioSrc("");
+        setProviderLabel("");
+      }
+      setHasError(false);
+    }
+  }, [call]);
+
+  const handleAudioError = () => {
+    if (providerLabel === "Cloudinary") {
+      console.warn("[AUDIO] Cloudinary source failed to load, falling back...");
+      if (call?.recordingPath && call.recordingPath !== call.recordingCloudinaryUrl) {
+        setAudioSrc(call.recordingPath);
+        setProviderLabel(call.recordingPath.startsWith("http") ? "Vobiz" : "Local");
+      } else if (call?.recordingVobizUrl && call.recordingVobizUrl !== call.recordingCloudinaryUrl) {
+        setAudioSrc(call.recordingVobizUrl);
+        setProviderLabel("Vobiz");
+      } else {
+        setHasError(true);
+      }
+    } else if (providerLabel === "Local" || providerLabel === "Vobiz") {
+      if (providerLabel === "Local" && call?.recordingVobizUrl) {
+        setAudioSrc(call.recordingVobizUrl);
+        setProviderLabel("Vobiz");
+      } else {
+        setHasError(true);
+      }
+    } else {
+      setHasError(true);
+    }
+  };
+
   if (!call) return null;
 
   const handleDownloadTranscript = () => {
@@ -123,15 +171,39 @@ export function CallDetailModal({ call, open, onClose }: CallDetailModalProps) {
           <div>
             <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">Audio Recording</p>
             <div className="rounded-xl border border-border bg-muted/50 p-4">
-              {call.recordingPath ? (
+              {audioSrc ? (
                 <>
-                  <audio key={call.recordingPath} controls className="w-full h-8" preload="metadata">
-                    <source src={call.recordingPath} type="audio/wav" />
+                  <audio 
+                    key={audioSrc} 
+                    controls 
+                    className="w-full h-8" 
+                    preload="metadata"
+                    onError={handleAudioError}
+                  >
+                    <source src={audioSrc} type="audio/wav" />
                     Your browser does not support the audio element.
                   </audio>
-                  <p className="mt-2 text-[11px] text-emerald-400 text-center font-medium">
-                    Outbound conversation recording available
-                  </p>
+                  
+                  {providerLabel && (
+                    <div className="mt-2 flex items-center justify-center gap-1.5 text-[11px]">
+                      <span className="text-muted-foreground">Source:</span>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-semibold tracking-wide ${
+                        providerLabel === "Cloudinary" 
+                          ? "bg-sky-500/10 text-sky-400 border border-sky-500/20" 
+                          : providerLabel === "Vobiz" 
+                          ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" 
+                          : "bg-slate-500/10 text-slate-400 border border-slate-500/20"
+                      }`}>
+                        Powered by {providerLabel}
+                      </span>
+                    </div>
+                  )}
+
+                  {hasError && (
+                    <p className="mt-2 text-[11px] text-red-400 text-center font-medium">
+                      Failed to load recording from Cloudinary, Local, or Vobiz sources.
+                    </p>
+                  )}
                 </>
               ) : (
                 <>

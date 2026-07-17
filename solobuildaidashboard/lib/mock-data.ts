@@ -57,6 +57,8 @@ export interface CallLog {
   transcript: string | { speaker: "agent" | "contact"; text: string; ts: number }[];
   summary: string;
   recordingPath?: string;
+  recordingCloudinaryUrl?: string;
+  recordingVobizUrl?: string;
   analysis?: {
     sentiment?: string;
     intent?: string;

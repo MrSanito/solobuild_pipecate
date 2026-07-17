@@ -291,6 +291,7 @@ export interface ICall extends Document {
   recordingId?: string; // Vobiz Recording ID
   recordingUri?: string; // Vobiz Recording remote download URI
   recordingLocalPath?: string; // Downloaded file location on local storage
+  recordingCloudinaryUrl?: string; // Cloudinary secure URL
   transcript: ITranscriptTurn[];
   transcriptSummary?: string;
   analysis?: ICallAnalysis;
@@ -321,6 +322,7 @@ const CallSchema = new Schema<ICall>(
     recordingId: { type: String },
     recordingUri: { type: String },
     recordingLocalPath: { type: String },
+    recordingCloudinaryUrl: { type: String },
     transcript: { type: [TranscriptTurnSchema], default: [] },
     transcriptSummary: { type: String },
     analysis: { type: CallAnalysisSchema },

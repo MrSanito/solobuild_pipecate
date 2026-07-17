@@ -83,7 +83,8 @@ export async function POST(req: Request) {
         // Update database call entry
         if (callEntry) {
           callEntry.recordingId = recordingId;
-          callEntry.recordingUri = cloudinaryUrl || recordUrl;
+          callEntry.recordingUri = recordUrl;
+          callEntry.recordingCloudinaryUrl = cloudinaryUrl;
           callEntry.recordingLocalPath = `/recordings/${filename}`;
           callEntry.callStatus = "completed";
           callEntry.endedAt = new Date();
