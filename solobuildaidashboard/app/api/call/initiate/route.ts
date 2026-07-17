@@ -4,7 +4,7 @@ import { Client, Call } from "@/lib/models";
 
 export async function POST(req: Request) {
   try {
-    const { phoneNumber, name, leadId } = await req.json();
+    const { phoneNumber, campaignId, contactId } = await req.json();
 
     if (!phoneNumber) {
       return NextResponse.json({ error: "Missing 'phoneNumber' in the request body" }, { status: 400 });
@@ -56,21 +56,9 @@ export async function POST(req: Request) {
     // Construct the Vobiz answer callback URL using Next.js request headers
     const host = req.headers.get("host") || "localhost:7860";
     const proto = req.headers.get("x-forwarded-proto") || "http";
-    let answerUrl = process.env.PUBLIC_URL 
-      ? (process.env.PUBLIC_URL.startsWith("http") ? process.env.PUBLIC_URL.replace(/\/$/, "") : `https://${process.env.PUBLIC_URL.replace(/\/$/, "")}`)
-      : `${proto}://${host}`;
-    
-    answerUrl = `${answerUrl}/api/call/answer`;
-
-    // Append name, number, and lead_id to the answer callback URL manually
-    const queryParams: string[] = [];
-    if (name) queryParams.push(`name=${encodeURIComponent(name)}`);
-    if (sanitizedPhone) queryParams.push(`number=${encodeURIComponent(sanitizedPhone)}`);
-    if (leadId) queryParams.push(`lead_id=${encodeURIComponent(leadId)}`);
-
-    if (queryParams.length > 0) {
-      answerUrl = `${answerUrl}?${queryParams.join("&")}`;
-    }
+    const answerUrl = process.env.PUBLIC_URL 
+      ? `${process.env.PUBLIC_URL.replace(/\/$/, "")}/api/call/answer` 
+      : `${proto}://${host}/api/call/answer`;
 
     console.log(`[INITIATE] Triggering outbound Vobiz call. Target: ${sanitizedPhone}, Answer URL: ${answerUrl}`);
 
@@ -103,7 +91,7 @@ export async function POST(req: Request) {
 
     // Create call entry in database
     if (client) {
-      await Call.create({
+      const callData: any = {
         clientId: client._id,
         direction: "outbound",
         providerCallId: callUuid,
@@ -111,8 +99,16 @@ export async function POST(req: Request) {
         toNumber: sanitizedPhone,
         callStatus: "initiated",
         startedAt: new Date(),
-        ...(leadId ? { contactId: leadId } : {}),
-      });
+      };
+
+      if (campaignId) {
+        callData.campaignId = campaignId;
+      }
+      if (contactId) {
+        callData.contactId = contactId;
+      }
+
+      await Call.create(callData);
       console.log(`[INITIATE] Created database call record for UUID: ${callUuid}`);
     }
 

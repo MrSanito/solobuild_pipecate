@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
-import { Call } from "@/lib/models";
+import { Call, Client } from "@/lib/models";
 
 export async function GET(req: Request) {
   return handleAnswer(req);
@@ -17,9 +17,6 @@ async function handleAnswer(req: Request) {
     // Parse query params first
     let CallUUID = searchParams.get("CallUUID") || searchParams.get("call_uuid");
     let bodyData = searchParams.get("body_data") || searchParams.get("body");
-    const name = searchParams.get("name") || "";
-    const number = searchParams.get("number") || "";
-    const leadId = searchParams.get("lead_id") || "";
 
     // Also parse form data / body if present
     const contentType = req.headers.get("content-type") || "";
@@ -43,25 +40,36 @@ async function handleAnswer(req: Request) {
 
     await dbConnect();
 
+    let clientGeminiApiKey = "";
+
     // Check if the call is marked for transfer
     if (CallUUID) {
       const callEntry = await Call.findOne({ providerCallId: CallUUID });
-      if (callEntry && (callEntry as any).transfer_requested) {
-        const agentNumber = process.env.TRANSFER_AGENT_NUMBER || "";
-        const transferXml = `<?xml version="1.0" encoding="UTF-8"?>
+      if (callEntry) {
+        if ((callEntry as any).transfer_requested) {
+          const agentNumber = process.env.TRANSFER_AGENT_NUMBER || "";
+          const transferXml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
     <Speak voice="WOMAN" language="en-US">
         Please hold while I transfer you to a human agent.
     </Speak>
     <Dial>${agentNumber}</Dial>
 </Response>`;
-        
-        callEntry.callStatus = "completed";
-        await callEntry.save();
+          
+          callEntry.callStatus = "completed";
+          await callEntry.save();
 
-        return new NextResponse(transferXml, {
-          headers: { "Content-Type": "application/xml" },
-        });
+          return new NextResponse(transferXml, {
+            headers: { "Content-Type": "application/xml" },
+          });
+        }
+
+        // Fetch the client to retrieve their Gemini API Key
+        const client = await Client.findById(callEntry.clientId).select("+geminiApiKey");
+        if (client && client.geminiApiKey) {
+          clientGeminiApiKey = client.geminiApiKey;
+          console.log(`[ANSWER] Found client Gemini API key for Client: ${client._id}`);
+        }
       }
     }
 
@@ -72,80 +80,33 @@ async function handleAnswer(req: Request) {
 
     let finalWsUrl = "";
 
-    if (env === "production") {
-      const agentName = process.env.AGENT_NAME || "quickstart-agent";
-      const apiKey = process.env.DAILY_API_KEY || "";
-      
+    let bodyObj: any = {};
+    if (bodyData) {
       try {
-        console.log(`[ANSWER] Requesting Pipecat Cloud start for agent: ${agentName}`);
-        const startUrl = `https://api.pipecat.daily.co/v1/public/${agentName}/start`;
-        
-        let parsedBody: any = {};
-        if (bodyData) {
-          try {
-            parsedBody = JSON.parse(bodyData);
-          } catch (e) {}
+        let decoded = bodyData;
+        if (!bodyData.trim().startsWith("{")) {
+          decoded = Buffer.from(bodyData, "base64").toString("utf-8");
         }
-
-        const startResponse = await fetch(startUrl, {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${apiKey}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            transport: "websocket",
-            body: {
-              name: name || parsedBody.name || "",
-              number: number || parsedBody.number || "",
-              lead_id: leadId || parsedBody.lead_id || "",
-              campaign: parsedBody.campaign || "sales",
-              language: parsedBody.language || "hi"
-            }
-          })
-        });
-
-        if (startResponse.ok) {
-          const startRes = await startResponse.json();
-          const token = startRes.token;
-          const wsUrl = startRes.wsUrl;
-          const resBody = startRes.body;
-          finalWsUrl = `${wsUrl}?token=${token}&body=${resBody}`;
-          console.log(`[ANSWER] Dynamic WS URL received: ${finalWsUrl}`);
-        } else {
-          const errText = await startResponse.text();
-          console.error(`[ANSWER] Start endpoint failed: status ${startResponse.status}, body: ${errText}`);
-          throw new Error("Start API returned non-200");
-        }
-      } catch (err) {
-        console.warn("[ANSWER] Falling back to static URL construction:", err);
-        const region = process.env.REGION || "ap-south";
-        const orgName = process.env.ORGANIZATION_NAME || "";
-        finalWsUrl = `wss://${region}.api.pipecat.daily.co/ws/generic?serviceHost=${agentName}.${orgName}`;
-        if (bodyData) {
-          const bodyEncoded = Buffer.from(bodyData).toString("base64");
-          finalWsUrl = `${finalWsUrl}&body=${bodyEncoded}`;
-        }
-        if (name) finalWsUrl = `${finalWsUrl}&name=${encodeURIComponent(name)}`;
-        if (number) finalWsUrl = `${finalWsUrl}&number=${encodeURIComponent(number)}`;
-        if (leadId) finalWsUrl = `${finalWsUrl}&lead_id=${encodeURIComponent(leadId)}`;
+        bodyObj = JSON.parse(decoded);
+      } catch (e) {
+        console.warn("[ANSWER] Failed to parse bodyData", e);
       }
+    }
+
+    if (clientGeminiApiKey) {
+      bodyObj.gemini_api_key = clientGeminiApiKey;
+    }
+
+    const bodyEncoded = Buffer.from(JSON.stringify(bodyObj)).toString("base64");
+
+    if (env === "production") {
+      const region = process.env.REGION || "ap-south";
+      const agentName = process.env.AGENT_NAME || "quickstart-agent";
+      const orgName = process.env.ORGANIZATION_NAME || "";
+      finalWsUrl = `wss://${region}.api.pipecat.daily.co/ws/generic?serviceHost=${agentName}.${orgName}&body=${bodyEncoded}`;
     } else {
       // Local/Ngrok websocket url
-      finalWsUrl = `wss://${host}/voice/ws`;
-      const urlParams = new URLSearchParams();  
-      if (bodyData) {
-        const bodyEncoded = Buffer.from(bodyData).toString("base64");
-        urlParams.set("body", bodyEncoded);
-      }
-      if (name) urlParams.set("name", name);
-      if (number) urlParams.set("number", number);
-      if (leadId) urlParams.set("lead_id", leadId);
-      
-      const queryStr = urlParams.toString();
-      if (queryStr) {
-        finalWsUrl = `${finalWsUrl}?${queryStr}`;
-      }
+      finalWsUrl = `wss://${host}/voice/ws?body=${bodyEncoded}`;
     }
 
     const vobizEncoding = process.env.VOBIZ_ENCODING || "audio/x-mulaw";
@@ -161,7 +122,7 @@ async function handleAnswer(req: Request) {
     <Record fileFormat="wav" maxLength="3600" recordSession="true" callbackUrl="${recordCallbackUrl}" callbackMethod="POST">
     </Record>
     <Stream bidirectional="true" audioTrack="inbound" contentType="${contentTypeHeader}" keepCallAlive="true">
-        ${finalWsUrl}
+        ${finalWsUrl.replace(/&/g, "&amp;")}
     </Stream>
 </Response>`;
 

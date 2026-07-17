@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Save, Globe, Bell, Shield, Key, Phone, Eye, EyeOff } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Save, Globe, Bell, Shield, Key, Phone, Eye, EyeOff, Brain, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ export default function SettingsPage() {
   const [showAuthToken, setShowAuthToken] = useState(false);
   const [showPhone, setShowPhone] = useState(false);
   const [showWebhookSecret, setShowWebhookSecret] = useState(false);
+  const [showGeminiKey, setShowGeminiKey] = useState(false);
 
   // General settings state
   const [workspaceName, setWorkspaceName] = useState("VoiceAI Production");
@@ -27,17 +28,57 @@ export default function SettingsPage() {
   const [sampleRate, setSampleRate] = useState("8000");
   const [l16Endian, setL16Endian] = useState("le");
 
-  const handleSave = (section: string) => {
+  // Gemini settings state
+  const [geminiApiKey, setGeminiApiKey] = useState("");
+  const [testingGemini, setTestingGemini] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // Load client settings from DB on mount
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const response = await fetch("/api/settings");
+        if (response.ok) {
+          const clientData = await response.json();
+          setWorkspaceName(clientData.name || "VoiceAI Production");
+          setTimezone(clientData.timezone || "Asia/Kolkata");
+          setDefaultCallerId(clientData.phone || "");
+
+          if (clientData.vobiz) {
+            setAuthId(clientData.vobiz.authId || "");
+            setAuthToken(clientData.vobiz.authToken || "");
+            setVobizPhone(clientData.vobiz.phoneNumber || "");
+            setWebhookSecret(clientData.vobiz.webhookSecret || "");
+            setAudioEncoding(clientData.vobiz.encoding || "audio/x-mulaw");
+            setSampleRate(String(clientData.vobiz.sampleRate || 8000));
+            setL16Endian(clientData.vobiz.l16Endian || "le");
+          }
+          setGeminiApiKey(clientData.geminiApiKey || "");
+        }
+      } catch (err) {
+        console.error("Failed to load settings:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadSettings();
+  }, []);
+
+  const handleSave = async (section: string) => {
+    let payload: any = { section };
+
     if (section === "General") {
       const sanitizedName = workspaceName.trim();
       const sanitizedTz = timezone.trim();
       const sanitizedCallerId = defaultCallerId.trim();
-      
+
       setWorkspaceName(sanitizedName);
       setTimezone(sanitizedTz);
       setDefaultCallerId(sanitizedCallerId);
-      
-      alert(`General settings saved! (Sanitized: Name="${sanitizedName}", Caller ID="${sanitizedCallerId}")`);
+
+      payload.name = sanitizedName;
+      payload.timezone = sanitizedTz;
+      payload.phone = sanitizedCallerId;
     } else if (section === "Vobiz") {
       const sanitizedAuthId = authId.trim();
       const sanitizedAuthToken = authToken.trim();
@@ -49,11 +90,72 @@ export default function SettingsPage() {
       setVobizPhone(sanitizedPhone);
       setWebhookSecret(sanitizedWebhook);
 
-      alert(`Vobiz carrier settings saved! (Sanitized: Auth ID="${sanitizedAuthId}", Phone="${sanitizedPhone}")`);
-    } else {
-      alert(`${section} settings saved successfully!`);
+      payload.authId = sanitizedAuthId;
+      payload.authToken = sanitizedAuthToken;
+      payload.phoneNumber = sanitizedPhone;
+      payload.webhookSecret = sanitizedWebhook;
+      payload.encoding = audioEncoding;
+      payload.sampleRate = Number(sampleRate);
+      payload.l16Endian = l16Endian;
+    } else if (section === "Gemini") {
+      const sanitizedGeminiKey = geminiApiKey.trim();
+      setGeminiApiKey(sanitizedGeminiKey);
+      payload.geminiApiKey = sanitizedGeminiKey;
+    }
+
+    try {
+      const response = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        alert(`${section} settings saved successfully!`);
+      } else {
+        const errData = await response.json();
+        alert(`Failed to save settings: ${errData.error || "Unknown error"}`);
+      }
+    } catch (err: any) {
+      alert(`Error saving settings: ${err.message}`);
     }
   };
+
+  const handleTestGemini = async () => {
+    if (!geminiApiKey.trim()) {
+      alert("Please enter a Gemini API Key first.");
+      return;
+    }
+
+    setTestingGemini(true);
+    try {
+      const response = await fetch("/api/settings/test-gemini", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiKey: geminiApiKey.trim() }),
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success) {
+        alert("Success: Gemini API key is valid and connected!");
+      } else {
+        alert(`Error testing key: ${data.error || "Failed to validate key"}`);
+      }
+    } catch (err: any) {
+      alert(`Connection failed: ${err.message}`);
+    } finally {
+      setTestingGemini(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-2">
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+        <p className="text-sm text-muted-foreground">Loading settings...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -268,45 +370,59 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* API Keys */}
+
+
+      {/* Gemini AI Config */}
       <Card className="border-border bg-card">
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50">
-                <Key className="h-4 w-4 text-emerald-600" />
-              </div>
-              <div>
-                <CardTitle className="text-[15px] font-semibold text-foreground">API Keys</CardTitle>
-                <CardDescription className="text-xs text-muted-foreground mt-0.5">Manage your API access</CardDescription>
-              </div>
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-50">
+              <Brain className="h-4 w-4 text-purple-600" />
             </div>
-            <Button size="sm" className="h-8 bg-indigo-600 hover:bg-indigo-700 text-white text-xs rounded-lg cursor-pointer">
-              Generate Key
-            </Button>
+            <div>
+              <CardTitle className="text-[15px] font-semibold text-foreground">Gemini AI Configuration</CardTitle>
+              <CardDescription className="text-xs text-muted-foreground mt-0.5">Client-specific Gemini API settings for call analysis and real-time AI agents</CardDescription>
+            </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-3">
-          {[
-            { name: "Production Key", key: "sk-prod-****...3f9a", created: "Jun 1, 2026", status: "Active" },
-            { name: "Development Key", key: "sk-dev-****...8b2c", created: "May 15, 2026", status: "Active" },
-            { name: "Legacy Key", key: "sk-leg-****...1d4e", created: "Jan 3, 2026", status: "Expired" },
-          ].map((k) => (
-            <div key={k.name} className="flex items-center justify-between rounded-xl border border-border px-4 py-3">
-              <div className="flex items-center gap-4">
-                <div>
-                  <p className="text-[13px] font-medium text-foreground">{k.name}</p>
-                  <p className="text-[11px] text-muted-foreground font-mono">{k.key}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-[11px] text-muted-foreground">{k.created}</span>
-                <Badge variant={k.status === "Active" ? "success" : "secondary"}>
-                  {k.status}
-                </Badge>
+        <CardContent className="space-y-4">
+          <div>
+            <label className="text-xs font-medium text-foreground mb-1.5 block">Gemini API Key</label>
+            <div className="relative">
+              <Input
+                type={showGeminiKey ? "text" : "password"}
+                placeholder="Enter Gemini API Key (e.g. AIzaSy...)"
+                value={geminiApiKey}
+                onChange={(e) => setGeminiApiKey(e.target.value)}
+                className="h-9 text-sm bg-muted/50 font-mono pr-28"
+              />
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowGeminiKey(!showGeminiKey)}
+                  className="text-slate-400 hover:text-white transition-colors cursor-pointer p-0.5"
+                >
+                  {showGeminiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+                <Button
+                  type="button"
+                  onClick={handleTestGemini}
+                  disabled={testingGemini}
+                  size="sm"
+                  className="h-7 text-[10px] bg-neutral-800 hover:bg-neutral-700 text-white rounded cursor-pointer"
+                >
+                  {testingGemini ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                  Test Key
+                </Button>
               </div>
             </div>
-          ))}
+          </div>
+          <div className="flex justify-end pt-3 border-t border-border/40">
+            <Button onClick={() => handleSave("Gemini")} size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 rounded-lg text-xs cursor-pointer">
+              <Save className="h-3.5 w-3.5" />
+              Save Gemini Settings
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

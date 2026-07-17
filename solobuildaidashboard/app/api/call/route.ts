@@ -34,9 +34,10 @@ export async function GET() {
         assignedAgent: "quickstart-agent",
         campaign: "Manual Dial",
         callDate: formattedDate,
-        transcript: call.transcriptSummary || "AI Transcript will appear here after call completion.",
+        transcript: call.transcript && call.transcript.length > 0 ? call.transcript : (call.transcriptSummary || "AI Transcript will appear here after call completion."),
         summary: call.transcriptSummary || "Outbound voice call campaign.",
         recordingPath: call.recordingLocalPath || undefined,
+        analysis: call.analysis || undefined,
       };
     });
 

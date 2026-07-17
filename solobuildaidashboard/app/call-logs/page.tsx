@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { callLogs, type CallLog } from "@/lib/mock-data";
+import { useCampaigns } from "@/lib/campaign-store";
+import type { CallLog } from "@/lib/mock-data";
 import { CallDetailModal } from "@/components/modals/call-detail-modal";
 
 function getCallStatusVariant(status: string) {
@@ -34,16 +35,21 @@ function getCallStatusDot(status: string) {
   }
 }
 
-const statusCounts = [
-  { label: "All Calls", value: "8", color: "text-foreground", bg: "bg-muted" },
-  { label: "Completed", value: "4", color: "text-emerald-600", bg: "bg-emerald-50" },
-  { label: "No Answer", value: "1", color: "text-amber-600", bg: "bg-amber-50" },
-  { label: "Failed", value: "1", color: "text-red-600", bg: "bg-red-50" },
-];
-
 export default function CallLogsPage() {
+  const { callLogs } = useCampaigns();
   const [selectedCall, setSelectedCall] = useState<CallLog | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+
+  const completedCount = callLogs.filter(c => c.status === "Completed").length;
+  const noAnswerCount = callLogs.filter(c => c.status === "No Answer").length;
+  const failedCount = callLogs.filter(c => c.status === "Failed").length;
+
+  const statusCounts = [
+    { label: "All Calls", value: String(callLogs.length), color: "text-foreground", bg: "bg-muted" },
+    { label: "Completed", value: String(completedCount), color: "text-emerald-600", bg: "bg-emerald-50" },
+    { label: "No Answer", value: String(noAnswerCount), color: "text-amber-600", bg: "bg-amber-50" },
+    { label: "Failed", value: String(failedCount), color: "text-red-600", bg: "bg-red-50" },
+  ];
 
   const filteredLogs = callLogs.filter(c =>
     c.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||

@@ -10,7 +10,7 @@ interface CampaignContextType {
   addCampaign: (
     campaign: Omit<Campaign, "id" | "stats">,
     leads?: { customerName: string; phoneNumber: string; company?: string }[]
-  ) => void;
+  ) => string;
   addLeadsToCampaign: (
     campaignId: string,
     leads: { customerName: string; phoneNumber: string; company?: string }[]
@@ -91,7 +91,7 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
   const addCampaign = (
     newCampaign: Omit<Campaign, "id" | "stats">,
     leads?: { customerName: string; phoneNumber: string; company?: string }[]
-  ) => {
+  ): string => {
     const campaignId = "c_" + Date.now();
     const campaign: Campaign = {
       ...newCampaign,
@@ -122,6 +122,8 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
       }));
       setCallLogs((prev) => [...newLogs, ...prev]);
     }
+
+    return campaignId;
   };
 
   const addLeadsToCampaign = (

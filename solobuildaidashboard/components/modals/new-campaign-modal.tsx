@@ -38,6 +38,11 @@ export function NewCampaignModal({ open, onClose }: NewCampaignModalProps) {
   const [fileName, setFileName] = useState("");
   const [uploadError, setUploadError] = useState<string | null>(null);
   
+  // Scheduler options
+  const [autoSchedule, setAutoSchedule] = useState<boolean>(false);
+  const [delayMinutes, setDelayMinutes] = useState<number>(1);
+  const [intervalMinutes, setIntervalMinutes] = useState<number>(2);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDownloadTemplate = () => {
@@ -139,7 +144,7 @@ export function NewCampaignModal({ open, onClose }: NewCampaignModalProps) {
       notes: l.notes.trim()
     }));
 
-    addCampaign({
+    const campaignId = addCampaign({
       name: trimmedName,
       assignedAgent: trimmedAgentName,
       purpose: trimmedPurpose,
@@ -149,11 +154,41 @@ export function NewCampaignModal({ open, onClose }: NewCampaignModalProps) {
       status
     }, leadsData);
 
+    if (autoSchedule && leadsData.length > 0) {
+      fetch("/api/call/schedule", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          leads: leadsData,
+          delayMinutes,
+          intervalMinutes,
+          campaignId,
+        }),
+      })
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error("Failed to schedule tasks on QStash");
+        }
+        return res.json();
+      })
+      .then((data) => {
+        console.log("Scheduled campaign calls successfully:", data);
+      })
+      .catch((err) => {
+        console.error("Scheduler error during campaign creation:", err);
+      });
+    }
+
     // Reset form states
     setName("");
     setDescription("");
     setStartDate("");
     setEndDate("");
+    setAutoSchedule(false);
+    setDelayMinutes(1);
+    setIntervalMinutes(2);
     handleRemoveFile();
     onClose();
   };
@@ -329,10 +364,56 @@ export function NewCampaignModal({ open, onClose }: NewCampaignModalProps) {
             )}
 
             {uploadedLeads.length > 0 && (
-              <div className="rounded-xl border border-border bg-muted/5 overflow-hidden">
-                <div className="bg-muted/20 px-3 py-1.5 border-b border-border">
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">Preview (First 2 Rows)</span>
+              <>
+                {/* Scheduling Options */}
+                <div className="bg-muted/10 p-3.5 rounded-xl border border-border space-y-3 my-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="newCampaignAutoSchedule"
+                        checked={autoSchedule}
+                        onChange={(e) => setAutoSchedule(e.target.checked)}
+                        className="h-3.5 w-3.5 text-indigo-600 border-border rounded focus:ring-indigo-500"
+                      />
+                      <label htmlFor="newCampaignAutoSchedule" className="text-xs font-semibold text-foreground cursor-pointer select-none">
+                        Auto-schedule calls via Upstash QStash
+                      </label>
+                    </div>
+                   </div>
+
+                  {autoSchedule && (
+                    <div className="grid grid-cols-2 gap-3.5 pt-1.5 border-t border-border/50 animate-in fade-in slide-in-from-top-1 duration-200">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-semibold text-muted-foreground">Initial Delay (minutes)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={delayMinutes}
+                          onChange={(e) => setDelayMinutes(Math.max(0, parseInt(e.target.value) || 0))}
+                          className="w-full h-8 px-2.5 text-xs bg-muted/20 border border-border rounded-lg text-foreground focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          placeholder="1"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-semibold text-muted-foreground">Call Spacing (minutes)</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={intervalMinutes}
+                          onChange={(e) => setIntervalMinutes(Math.max(1, parseInt(e.target.value) || 1))}
+                          className="w-full h-8 px-2.5 text-xs bg-muted/20 border border-border rounded-lg text-foreground focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          placeholder="2"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
+
+                <div className="rounded-xl border border-border bg-muted/5 overflow-hidden">
+                  <div className="bg-muted/20 px-3 py-1.5 border-b border-border">
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">Preview (First 2 Rows)</span>
+                  </div>
                 <div className="divide-y divide-border">
                   {uploadedLeads.slice(0, 2).map((lead, idx) => (
                     <div key={idx} className="p-2.5 text-[11px] grid grid-cols-3 gap-2">
@@ -343,6 +424,7 @@ export function NewCampaignModal({ open, onClose }: NewCampaignModalProps) {
                   ))}
                 </div>
               </div>
+              </>
             )}
           </div>
 

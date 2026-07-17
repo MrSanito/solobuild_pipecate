@@ -10,7 +10,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { agents } from "@/lib/mock-data";
+import { useCampaigns } from "@/lib/campaign-store";
 
 const avatarColors = [
   "from-indigo-400 to-indigo-600",
@@ -35,6 +35,7 @@ interface AgentTableProps {
 }
 
 export function AgentTable({ onAddAgentClick }: AgentTableProps) {
+  const { agents } = useCampaigns();
   return (
     <Card className="border-border bg-card">
       <CardHeader>

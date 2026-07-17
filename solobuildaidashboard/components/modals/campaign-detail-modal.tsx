@@ -78,7 +78,54 @@ export function CampaignDetailModal({ campaign, open, onClose }: CampaignDetailM
   const [uploadSuccessCount, setUploadSuccessCount] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Scheduler options
+  const [autoSchedule, setAutoSchedule] = useState<boolean>(false);
+  const [delayMinutes, setDelayMinutes] = useState<number>(1);
+  const [intervalMinutes, setIntervalMinutes] = useState<number>(2);
+
+  // Call trigger state
+  const [callingLeadId, setCallingLeadId] = useState<string | null>(null);
+  const [callStatusMessage, setCallStatusMessage] = useState<string | null>(null);
+  const [callErrorMessage, setCallErrorMessage] = useState<string | null>(null);
+
   if (!campaign) return null;
+
+  const handleInitiateCall = async (phoneNumber: string, leadId: string) => {
+    setCallingLeadId(leadId);
+    setCallStatusMessage("Connecting call via Vobiz...");
+    setCallErrorMessage(null);
+
+    try {
+      const response = await fetch("/api/call/initiate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          phoneNumber,
+          campaignId: campaign.id,
+          contactId: leadId,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to trigger call");
+      }
+
+      setCallStatusMessage("Call successfully initiated!");
+      setTimeout(() => {
+        setCallingLeadId(null);
+        setCallStatusMessage(null);
+      }, 3000);
+    } catch (err: any) {
+      setCallErrorMessage(err.message || "An unexpected error occurred");
+      setTimeout(() => {
+        setCallingLeadId(null);
+        setCallErrorMessage(null);
+      }, 5000);
+    }
+  };
 
   // Filter logs for this campaign
   const campaignLeads = callLogs.filter(log => log.campaign === campaign.name);
@@ -161,7 +208,40 @@ export function CampaignDetailModal({ campaign, open, onClose }: CampaignDetailM
         }
 
         addLeadsToCampaign(campaign.id, parsed);
-        setUploadSuccessCount(parsed.length);
+        
+        if (autoSchedule) {
+          fetch("/api/call/schedule", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              leads: parsed,
+              delayMinutes,
+              intervalMinutes,
+              campaignId: campaign.id,
+            }),
+          })
+          .then((res) => {
+            if (!res.ok) {
+              throw new Error("Failed to schedule tasks on QStash");
+            }
+            return res.json();
+          })
+          .then((data) => {
+            console.log("Scheduled successfully:", data);
+            setUploadSuccessCount(parsed.length);
+            setCallStatusMessage(`Imported ${parsed.length} leads and scheduled calling queue with Upstash scheduler!`);
+            setTimeout(() => setCallStatusMessage(null), 6000);
+          })
+          .catch((err) => {
+            console.error("Scheduler error:", err);
+            setCallErrorMessage("Leads imported to list, but QStash call scheduling failed: " + err.message);
+            setTimeout(() => setCallErrorMessage(null), 6000);
+          });
+        } else {
+          setUploadSuccessCount(parsed.length);
+        }
         
         // Reset file input
         if (fileInputRef.current) {
@@ -177,7 +257,7 @@ export function CampaignDetailModal({ campaign, open, onClose }: CampaignDetailM
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="sm:max-w-[620px] max-h-[85vh] flex flex-col p-6 bg-card border-border text-foreground">
+      <DialogContent className="sm:max-w-[620px] max-h-[85vh] flex flex-col p-6">
         <DialogHeader className="mb-2 shrink-0">
           <div className="flex items-center justify-between">
             <DialogTitle className="text-foreground text-[16px] font-semibold">{campaign.name}</DialogTitle>
@@ -314,6 +394,52 @@ export function CampaignDetailModal({ campaign, open, onClose }: CampaignDetailM
                 </div>
               </div>
 
+              {/* Scheduling Options */}
+              <div className="bg-muted/10 p-3.5 rounded-xl border border-border space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="autoSchedule"
+                      checked={autoSchedule}
+                      onChange={(e) => setAutoSchedule(e.target.checked)}
+                      className="h-3.5 w-3.5 text-indigo-600 border-border rounded focus:ring-indigo-500"
+                    />
+                    <label htmlFor="autoSchedule" className="text-xs font-semibold text-foreground cursor-pointer select-none">
+                      Auto-schedule calls via Upstash QStash
+                    </label>
+                  </div>
+                  <span className="text-[9px] text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full font-medium">Powered by QStash</span>
+                </div>
+
+                {autoSchedule && (
+                  <div className="grid grid-cols-2 gap-3.5 pt-1.5 border-t border-border/50 animate-in fade-in slide-in-from-top-1 duration-200">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-semibold text-muted-foreground">Initial Delay (minutes)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={delayMinutes}
+                        onChange={(e) => setDelayMinutes(Math.max(0, parseInt(e.target.value) || 0))}
+                        className="w-full h-8 px-2.5 text-xs bg-muted/20 border border-border rounded-lg text-foreground focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        placeholder="1"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-semibold text-muted-foreground">Call Spacing (minutes)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={intervalMinutes}
+                        onChange={(e) => setIntervalMinutes(Math.max(1, parseInt(e.target.value) || 1))}
+                        className="w-full h-8 px-2.5 text-xs bg-muted/20 border border-border rounded-lg text-foreground focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        placeholder="2"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Upload Notifications */}
               {uploadError && (
                 <div className="flex items-center gap-2 rounded-lg bg-rose-500/10 border border-rose-500/20 p-2.5 text-rose-400">
@@ -329,6 +455,18 @@ export function CampaignDetailModal({ campaign, open, onClose }: CampaignDetailM
               )}
 
               {/* Leads Table */}
+              {callStatusMessage && (
+                <div className="flex items-center gap-2 rounded-lg bg-indigo-500/10 border border-indigo-500/20 p-2.5 text-indigo-400 mb-2">
+                  <span className="text-[11px] font-semibold">{callStatusMessage}</span>
+                </div>
+              )}
+              {callErrorMessage && (
+                <div className="flex items-center gap-2 rounded-lg bg-rose-500/10 border border-rose-500/20 p-2.5 text-rose-400 mb-2">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span className="text-[11px] font-medium">{callErrorMessage}</span>
+                </div>
+              )}
+
               <div className="rounded-xl border border-border bg-card overflow-hidden">
                 <div className="max-h-[320px] overflow-y-auto">
                   {campaignLeads.length === 0 ? (
@@ -345,7 +483,7 @@ export function CampaignDetailModal({ campaign, open, onClose }: CampaignDetailM
                           <TableHead className="text-xs py-2 h-9">Company</TableHead>
                           <TableHead className="text-xs py-2 h-9">Phone Number</TableHead>
                           <TableHead className="text-xs py-2 h-9">Status</TableHead>
-                          <TableHead className="text-xs py-2 h-9 w-[60px] text-right">Action</TableHead>
+                          <TableHead className="text-xs py-2 h-9 text-right">Action</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -370,29 +508,10 @@ export function CampaignDetailModal({ campaign, open, onClose }: CampaignDetailM
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                className="h-7 w-7 p-0 text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg cursor-pointer"
-                                onClick={async (e) => {
-                                  e.stopPropagation();
-                                  try {
-                                    const response = await fetch("/api/call/initiate", {
-                                      method: "POST",
-                                      headers: { "Content-Type": "application/json" },
-                                      body: JSON.stringify({
-                                        phoneNumber: lead.phoneNumber,
-                                        name: lead.customerName,
-                                        leadId: lead.id,
-                                      }),
-                                    });
-                                    if (response.ok) {
-                                      alert(`Call triggered successfully to ${lead.customerName}!`);
-                                    } else {
-                                      const data = await response.json();
-                                      alert(`Failed to trigger call: ${data.error}`);
-                                    }
-                                  } catch (err: any) {
-                                    alert(`Error: ${err.message}`);
-                                  }
-                                }}
+                                disabled={callingLeadId !== null}
+                                onClick={() => handleInitiateCall(lead.phoneNumber, lead.id)}
+                                className="h-7 w-7 p-0 text-indigo-400 hover:text-indigo-300 rounded-lg"
+                                title="Call this contact"
                               >
                                 <Phone className="h-3.5 w-3.5" />
                               </Button>

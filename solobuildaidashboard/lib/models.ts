@@ -121,6 +121,7 @@ export interface IClient extends Document {
   plan: 'trial' | 'starter' | 'pro';
   isActive: boolean;
   vobiz: IVobizConfig;
+  geminiApiKey?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -136,6 +137,7 @@ const ClientSchema = new Schema<IClient>(
     plan: { type: String, enum: ['trial', 'starter', 'pro'], default: 'trial' },
     isActive: { type: Boolean, default: true },
     vobiz: { type: VobizConfigSchema, required: true },
+    geminiApiKey: { type: String, select: false },
   },
   { timestamps: true }
 );
@@ -257,12 +259,16 @@ interface ICallAnalysis {
   sentiment?: string;
   intent?: string;
   actionItems?: string[];
+  status?: string;
+  subStatus?: string;
 }
 const CallAnalysisSchema = new Schema<ICallAnalysis>(
   {
     sentiment: { type: String },
     intent: { type: String },
     actionItems: { type: [String], default: [] },
+    status: { type: String },
+    subStatus: { type: String },
   },
   { _id: false }
 );

@@ -54,9 +54,16 @@ export interface CallLog {
   assignedAgent: string;
   campaign: string;
   callDate: string;
-  transcript: string;
+  transcript: string | { speaker: "agent" | "contact"; text: string; ts: number }[];
   summary: string;
   recordingPath?: string;
+  analysis?: {
+    sentiment?: string;
+    intent?: string;
+    actionItems?: string[];
+    status?: string;
+    subStatus?: string;
+  };
 }
 
 export const callLogs: CallLog[] = [];

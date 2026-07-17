@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { Bell, Search, Plus } from "lucide-react";
+import { ProfileModal } from "@/components/modals/profile-modal";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,6 +26,9 @@ const pageTitles: Record<string, { title: string; subtitle: string }> = {
 export function Navbar() {
   const pathname = usePathname();
   const page = pageTitles[pathname] || pageTitles["/"];
+  
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [profileDefaultTab, setProfileDefaultTab] = useState<"general" | "vobiz" | "gemini">("general");
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/80 backdrop-blur-xl px-8">
@@ -71,13 +76,31 @@ export function Navbar() {
               <p className="text-xs text-slate-500">vishal@voiceai.com</p>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Profile</DropdownMenuItem>
-            <DropdownMenuItem>Billing</DropdownMenuItem>
-            <DropdownMenuItem>API Keys</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => { setProfileDefaultTab("general"); setIsProfileOpen(true); }} className="cursor-pointer">
+              Profile
+            </DropdownMenuItem>
+            <DropdownMenuItem className="cursor-pointer">Billing</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => { setProfileDefaultTab("gemini"); setIsProfileOpen(true); }} className="cursor-pointer">
+              API Keys
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-red-600">Log out</DropdownMenuItem>
+            <DropdownMenuItem 
+              className="text-red-600 cursor-pointer"
+              onSelect={() => {
+                sessionStorage.removeItem("solobuild_auth");
+                window.location.reload();
+              }}
+            >
+              Log out
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        <ProfileModal 
+          open={isProfileOpen} 
+          onClose={() => setIsProfileOpen(false)} 
+          defaultTab={profileDefaultTab} 
+        />
       </div>
     </header>
   );
