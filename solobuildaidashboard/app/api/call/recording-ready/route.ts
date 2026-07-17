@@ -3,6 +3,7 @@ import dbConnect from "@/lib/mongodb";
 import { Call, Client } from "@/lib/models";
 import fs from "fs";
 import path from "path";
+import { uploadRecording } from "@/lib/cloudinary";
 
 export async function POST(req: Request) {
   try {
@@ -71,10 +72,18 @@ export async function POST(req: Request) {
         fs.writeFileSync(filePath, buffer);
         console.log(`[RECORDING] Recording saved locally to: ${filePath}`);
 
+        // Upload to Cloudinary
+        let cloudinaryUrl = "";
+        try {
+          cloudinaryUrl = await uploadRecording(filePath, recordingId);
+        } catch (cloudinaryErr) {
+          console.error(`[RECORDING] Cloudinary upload failed:`, cloudinaryErr);
+        }
+
         // Update database call entry
         if (callEntry) {
           callEntry.recordingId = recordingId;
-          callEntry.recordingUri = recordUrl;
+          callEntry.recordingUri = cloudinaryUrl || recordUrl;
           callEntry.recordingLocalPath = `/recordings/${filename}`;
           callEntry.callStatus = "completed";
           callEntry.endedAt = new Date();
@@ -167,7 +176,7 @@ Return ONLY JSON.`;
                         },
                         subStatus: {
                           type: "STRING",
-                          enum: ["<1 Min", "1-3 Mins", "+3 Mins", "Appointment Set", ""]
+                          enum: ["<1 Min", "1-3 Mins", "+3 Mins", "Appointment Set", "None"]
                         }
                       },
                       required: ["transcript", "summary", "intent", "sentiment", "actionItems", "status", "subStatus"]
@@ -208,7 +217,7 @@ Return ONLY JSON.`;
                     intent: analysisResult.intent,
                     actionItems: analysisResult.actionItems || [],
                     status: analysisResult.status,
-                    subStatus: analysisResult.subStatus
+                    subStatus: analysisResult.subStatus === "None" ? "" : (analysisResult.subStatus || "")
                   };
                 } else {
                   console.error(`[RECORDING] Empty content parts returned from Gemini API`);

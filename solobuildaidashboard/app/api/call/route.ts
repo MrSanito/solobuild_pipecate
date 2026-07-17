@@ -36,7 +36,9 @@ export async function GET() {
         callDate: formattedDate,
         transcript: call.transcript && call.transcript.length > 0 ? call.transcript : (call.transcriptSummary || "AI Transcript will appear here after call completion."),
         summary: call.transcriptSummary || "Outbound voice call campaign.",
-        recordingPath: call.recordingLocalPath || undefined,
+        recordingPath: call.recordingUri && !call.recordingUri.includes("vobiz.ai")
+          ? call.recordingUri
+          : (call.recordingLocalPath || call.recordingUri || undefined),
         analysis: call.analysis || undefined,
       };
     });
