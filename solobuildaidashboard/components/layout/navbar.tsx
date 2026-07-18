@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
+import { fetchWithAuth } from "@/lib/api";
 import { Bell, Search, Plus } from "lucide-react";
 import { ProfileModal } from "@/components/modals/profile-modal";
 import { Input } from "@/components/ui/input";
@@ -29,6 +30,36 @@ export function Navbar() {
   
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [profileDefaultTab, setProfileDefaultTab] = useState<"general" | "vobiz" | "gemini">("general");
+
+  const [userName, setUserName] = useState("");
+  const [userEmail, setUserEmail] = useState("");
+  const [userInitials, setUserInitials] = useState("U");
+
+  useEffect(() => {
+    async function fetchUser() {
+      try {
+        const response = await fetchWithAuth("/api/settings");
+        if (response.ok) {
+          const clientData = await response.json();
+          setUserName(clientData.name || "User");
+          setUserEmail(clientData.email || "");
+          
+          if (clientData.name) {
+            const initials = clientData.name
+              .split(" ")
+              .map((n: string) => n[0])
+              .join("")
+              .substring(0, 2)
+              .toUpperCase();
+            setUserInitials(initials || "U");
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch user for navbar", error);
+      }
+    }
+    fetchUser();
+  }, []);
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/80 backdrop-blur-xl px-8">
@@ -65,15 +96,15 @@ export function Navbar() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="h-8 gap-2 px-2 rounded-lg">
-              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-[10px] font-bold text-white">
-                VK
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-[10px] font-bold text-white uppercase">
+                {userInitials}
               </div>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
             <DropdownMenuLabel className="font-normal">
-              <p className="text-sm font-medium">Vishal Kumar</p>
-              <p className="text-xs text-slate-500">vishal@voiceai.com</p>
+              <p className="text-sm font-medium">{userName || "Loading..."}</p>
+              <p className="text-xs text-slate-500">{userEmail}</p>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => { setProfileDefaultTab("general"); setIsProfileOpen(true); }} className="cursor-pointer">
@@ -87,7 +118,7 @@ export function Navbar() {
             <DropdownMenuItem 
               className="text-red-600 cursor-pointer"
               onSelect={() => {
-                sessionStorage.removeItem("solobuild_auth");
+                sessionStorage.clear();
                 window.location.reload();
               }}
             >

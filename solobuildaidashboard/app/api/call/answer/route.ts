@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
-import { Call, Client } from "@/lib/models";
+import { Call, Client, Agent } from "@/lib/models";
 
 export async function GET(req: Request) {
   return handleAnswer(req);
@@ -17,6 +17,9 @@ async function handleAnswer(req: Request) {
     // Parse query params first
     let CallUUID = searchParams.get("CallUUID") || searchParams.get("call_uuid");
     let bodyData = searchParams.get("body_data") || searchParams.get("body");
+    const agentId = searchParams.get("agentId");
+    const queryAgentName = searchParams.get("agentName");
+    const queryOrgName = searchParams.get("orgName");
 
     // Also parse form data / body if present
     const contentType = req.headers.get("content-type") || "";
@@ -101,8 +104,21 @@ async function handleAnswer(req: Request) {
 
     if (env === "production") {
       const region = process.env.REGION || "ap-south";
-      const agentName = process.env.AGENT_NAME || "quickstart-agent";
-      const orgName = process.env.ORGANIZATION_NAME || "";
+      let agentName = queryAgentName;
+      let orgName = queryOrgName;
+
+      if (agentId && (!agentName || !orgName)) {
+        const dbAgent = await Agent.findById(agentId);
+        if (dbAgent) {
+          agentName = dbAgent.agentName;
+          orgName = dbAgent.orgName;
+        }
+      }
+
+      if (!agentName || !orgName) {
+        throw new Error("Missing agentName or orgName for production Pipecat connection");
+      }
+
       finalWsUrl = `wss://${region}.api.pipecat.daily.co/ws/generic?serviceHost=${agentName}.${orgName}&body=${bodyEncoded}`;
     } else {
       // Local/Ngrok websocket url

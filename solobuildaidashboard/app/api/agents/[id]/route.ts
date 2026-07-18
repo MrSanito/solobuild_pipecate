@@ -6,10 +6,12 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   try {
     await dbConnect();
     
-    let client = await Client.findOne({ email: "contact@solobuildai.com" });
-    if (!client) {
-      client = await Client.findOne();
+    const clientEmail = req.headers.get("x-client-email");
+    if (!clientEmail) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    
+    const client = await Client.findOne({ email: clientEmail });
     
     if (!client) {
       return NextResponse.json({ error: "No client found" }, { status: 400 });

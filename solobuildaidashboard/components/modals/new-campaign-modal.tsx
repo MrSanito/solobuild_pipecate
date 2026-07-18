@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState, useRef } from "react";
-import { Upload, X, FileSpreadsheet, Download, AlertCircle, Check } from "lucide-react";
+import { Upload, X, FileSpreadsheet, Download, AlertCircle, Check, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { fetchWithAuth } from "@/lib/api";
 import { useCampaigns } from "@/lib/campaign-store";
 import * as XLSX from "xlsx";
 
@@ -42,6 +43,8 @@ export function NewCampaignModal({ open, onClose }: NewCampaignModalProps) {
   const [autoSchedule, setAutoSchedule] = useState<boolean>(false);
   const [delayMinutes, setDelayMinutes] = useState<number>(1);
   const [intervalMinutes, setIntervalMinutes] = useState<number>(2);
+  
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -124,7 +127,7 @@ export function NewCampaignModal({ open, onClose }: NewCampaignModalProps) {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedName = name.trim();
     const trimmedAgentName = agentName.trim();
@@ -136,6 +139,8 @@ export function NewCampaignModal({ open, onClose }: NewCampaignModalProps) {
       return;
     }
 
+    setIsSubmitting(true);
+
     const leadsData = uploadedLeads.map(l => ({
       customerName: l.name.trim(),
       phoneNumber: l.phone.trim(),
@@ -144,7 +149,7 @@ export function NewCampaignModal({ open, onClose }: NewCampaignModalProps) {
       notes: l.notes.trim()
     }));
 
-    const campaignId = addCampaign({
+    const campaignId = await addCampaign({
       name: trimmedName,
       assignedAgent: trimmedAgentName,
       purpose: trimmedPurpose,
@@ -155,7 +160,7 @@ export function NewCampaignModal({ open, onClose }: NewCampaignModalProps) {
     }, leadsData);
 
     if (autoSchedule && leadsData.length > 0) {
-      fetch("/api/call/schedule", {
+      fetchWithAuth("/api/call/schedule", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -175,12 +180,18 @@ export function NewCampaignModal({ open, onClose }: NewCampaignModalProps) {
       })
       .then((data) => {
         console.log("Scheduled campaign calls successfully:", data);
+        finishSubmit();
       })
       .catch((err) => {
         console.error("Scheduler error during campaign creation:", err);
+        finishSubmit();
       });
+    } else {
+      finishSubmit();
     }
+  };
 
+  const finishSubmit = () => {
     // Reset form states
     setName("");
     setDescription("");
@@ -190,6 +201,7 @@ export function NewCampaignModal({ open, onClose }: NewCampaignModalProps) {
     setDelayMinutes(1);
     setIntervalMinutes(2);
     handleRemoveFile();
+    setIsSubmitting(false);
     onClose();
   };
 
@@ -442,9 +454,17 @@ export function NewCampaignModal({ open, onClose }: NewCampaignModalProps) {
             </Button>
             <Button
               type="submit"
-              className="h-9 bg-indigo-600 hover:bg-indigo-700 text-white text-xs rounded-lg font-medium"
+              disabled={isSubmitting}
+              className="h-9 bg-indigo-600 hover:bg-indigo-700 text-white text-xs rounded-lg font-medium gap-2"
             >
-              Create Campaign
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                "Create Campaign"
+              )}
             </Button>
           </DialogFooter>
         </form>

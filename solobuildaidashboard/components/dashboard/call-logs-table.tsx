@@ -66,42 +66,50 @@ export function CallLogsTable() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {callLogs.map((call) => (
-                <TableRow 
-                  key={call.id} 
-                  className="group cursor-pointer hover:bg-muted/50 transition-colors border-border"
-                  onClick={() => setSelectedCall(call)}
-                >
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-[11px] font-semibold text-muted-foreground">
-                        {call.customerName.split(" ").map(n => n[0]).join("")}
-                      </div>
-                      <span className="font-medium text-foreground text-[13px]">{call.customerName}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-[13px]">{call.company}</TableCell>
-                  <TableCell className="text-muted-foreground font-mono text-[11px]">{call.phoneNumber}</TableCell>
-                  <TableCell className="text-foreground font-semibold text-[13px]">{call.duration}</TableCell>
-                  <TableCell>
-                    <Badge variant={getCallStatusVariant(call.status)}>
-                      <span className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${getCallStatusDot(call.status)}`} />
-                      {call.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-xs text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => setSelectedCall(call)}
-                    >
-                      Details
-                      <ArrowRight className="h-3 w-3" />
-                    </Button>
+              {callLogs.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                    No calls found.
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                callLogs.map((call) => (
+                  <TableRow 
+                    key={call.id} 
+                    className="group cursor-pointer hover:bg-muted/50 transition-colors border-border"
+                    onClick={() => setSelectedCall(call)}
+                  >
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-[11px] font-semibold text-muted-foreground">
+                          {call.customerName.split(" ").map(n => n[0]).join("")}
+                        </div>
+                        <span className="font-medium text-foreground text-[13px]">{call.customerName}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-[13px]">{call.company}</TableCell>
+                    <TableCell className="text-muted-foreground font-mono text-[11px]">{call.phoneNumber}</TableCell>
+                    <TableCell className="text-foreground font-semibold text-[13px]">{call.duration}</TableCell>
+                    <TableCell>
+                      <Badge variant={getCallStatusVariant(call.status)}>
+                        <span className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${getCallStatusDot(call.status)}`} />
+                        {call.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => setSelectedCall(call)}
+                      >
+                        Details
+                        <ArrowRight className="h-3 w-3" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>

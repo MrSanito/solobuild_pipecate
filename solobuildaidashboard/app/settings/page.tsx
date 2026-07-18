@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import toast from "react-hot-toast";
+import { fetchWithAuth } from "@/lib/api";
 import { Save, Globe, Bell, Shield, Key, Phone, Eye, EyeOff, Brain, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,12 +34,13 @@ export default function SettingsPage() {
   const [geminiApiKey, setGeminiApiKey] = useState("");
   const [testingGemini, setTestingGemini] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Load client settings from DB on mount
   useEffect(() => {
     async function loadSettings() {
       try {
-        const response = await fetch("/api/settings");
+        const response = await fetchWithAuth("/api/settings");
         if (response.ok) {
           const clientData = await response.json();
           setWorkspaceName(clientData.name || "VoiceAI Production");
@@ -65,6 +68,7 @@ export default function SettingsPage() {
   }, []);
 
   const handleSave = async (section: string) => {
+    setIsSaving(true);
     let payload: any = { section };
 
     if (section === "General") {
@@ -104,32 +108,34 @@ export default function SettingsPage() {
     }
 
     try {
-      const response = await fetch("/api/settings", {
+      const response = await fetchWithAuth("/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
       if (response.ok) {
-        alert(`${section} settings saved successfully!`);
+        toast.success(`${section} settings saved successfully!`);
       } else {
         const errData = await response.json();
-        alert(`Failed to save settings: ${errData.error || "Unknown error"}`);
+        toast.error(`Failed to save settings: ${errData.error || "Unknown error"}`);
       }
     } catch (err: any) {
-      alert(`Error saving settings: ${err.message}`);
+      toast.error(`Error saving settings: ${err.message}`);
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handleTestGemini = async () => {
     if (!geminiApiKey.trim()) {
-      alert("Please enter a Gemini API Key first.");
+      toast.error("Please enter a Gemini API Key first.");
       return;
     }
 
     setTestingGemini(true);
     try {
-      const response = await fetch("/api/settings/test-gemini", {
+      const response = await fetchWithAuth("/api/settings/test-gemini", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ apiKey: geminiApiKey.trim() }),
@@ -137,12 +143,12 @@ export default function SettingsPage() {
 
       const data = await response.json();
       if (response.ok && data.success) {
-        alert("Success: Gemini API key is valid and connected!");
+        toast.success("Success: Gemini API key is valid and connected!");
       } else {
-        alert(`Error testing key: ${data.error || "Failed to validate key"}`);
+        toast.error(`Error testing key: ${data.error || "Failed to validate key"}`);
       }
     } catch (err: any) {
-      alert(`Connection failed: ${err.message}`);
+      toast.error(`Connection failed: ${err.message}`);
     } finally {
       setTestingGemini(false);
     }
@@ -188,8 +194,8 @@ export default function SettingsPage() {
             <Input value={defaultCallerId} onChange={(e) => setDefaultCallerId(e.target.value)} className="h-9 text-sm bg-muted/50 max-w-xs font-mono" />
           </div>
           <div className="flex justify-end pt-3 border-t border-border/40">
-            <Button onClick={() => handleSave("General")} size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 rounded-lg text-xs cursor-pointer">
-              <Save className="h-3.5 w-3.5" />
+            <Button onClick={() => handleSave("General")} disabled={isSaving} size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 rounded-lg text-xs cursor-pointer">
+              {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
               Save General Settings
             </Button>
           </div>
@@ -319,8 +325,8 @@ export default function SettingsPage() {
           </div>
 
           <div className="flex justify-end pt-3 border-t border-border/40">
-            <Button onClick={() => handleSave("Vobiz")} size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 rounded-lg text-xs cursor-pointer">
-              <Save className="h-3.5 w-3.5" />
+            <Button onClick={() => handleSave("Vobiz")} disabled={isSaving} size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 rounded-lg text-xs cursor-pointer">
+              {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
               Save Vobiz Settings
             </Button>
           </div>
@@ -418,9 +424,9 @@ export default function SettingsPage() {
             </div>
           </div>
           <div className="flex justify-end pt-3 border-t border-border/40">
-            <Button onClick={() => handleSave("Gemini")} size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 rounded-lg text-xs cursor-pointer">
-              <Save className="h-3.5 w-3.5" />
-              Save Gemini Settings
+            <Button onClick={() => handleSave("Gemini")} disabled={isSaving} size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 rounded-lg text-xs cursor-pointer">
+              {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+              Save Gemini Key
             </Button>
           </div>
         </CardContent>

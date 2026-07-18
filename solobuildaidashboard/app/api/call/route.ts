@@ -1,13 +1,31 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
-import { Call } from "@/lib/models";
+import { Call, Client } from "@/lib/models";
+import { verifyToken } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     await dbConnect();
     
-    // Fetch latest calls sorted by date
-    const dbCalls = await Call.find().sort({ createdAt: -1 }).limit(50);
+    const authHeader = req.headers.get("authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const token = authHeader.split(" ")[1];
+    const decoded = await verifyToken(token);
+    
+    if (!decoded) {
+      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+    }
+
+    const clientEmail = decoded.email;
+
+    const client = await Client.findOne({ email: clientEmail });
+    if (!client) {
+      return NextResponse.json({ error: "Client not found" }, { status: 404 });
+    }
+
+    const dbCalls = await Call.find({ clientId: client._id }).sort({ createdAt: -1 }).limit(50);
     
     const callLogs = dbCalls.map((call) => {
       const durationSeconds = call.durationSeconds || 0;

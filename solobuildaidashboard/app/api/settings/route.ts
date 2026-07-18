@@ -3,17 +3,19 @@ import dbConnect from "@/lib/mongodb";
 import { Client } from "@/lib/models";
 
 // GET client settings
-export async function GET() {
+export async function GET(req: Request) {
   try {
     await dbConnect();
 
-    // Fetch the client with sensitive fields explicitly selected
-    let client = await Client.findOne({ email: "contact@solobuildai.com" }).select("+vobiz.authToken +geminiApiKey");
-    if (!client) {
-      client = await Client.findOne().select("+vobiz.authToken +geminiApiKey");
+    const clientEmail = req.headers.get("x-client-email");
+    if (!clientEmail) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Self-healing: If no client exists, create one from env vars
+    // Fetch the client with sensitive fields explicitly selected
+    let client = await Client.findOne({ email: clientEmail }).select("+vobiz.authToken +geminiApiKey");
+    
+    // Self-healing: If no client exists, create one from env vars (only for specific dev cases, better to just return 404 but keeping for compatibility)
     if (!client) {
       const envAuthId = process.env.VOBIZ_AUTH_ID || "";
       const envAuthToken = process.env.VOBIZ_AUTH_TOKEN || "";
@@ -23,7 +25,7 @@ export async function GET() {
       client = await Client.create({
         name: "Solobuild AI User",
         slug: "solobuild-ai-user",
-        email: "contact@solobuildai.com",
+        email: clientEmail,
         passwordHash: "placeholder_hash_value",
         vobiz: {
           authId: envAuthId,
@@ -51,15 +53,17 @@ export async function GET() {
 // POST client settings updates
 export async function POST(req: Request) {
   try {
+    const clientEmail = req.headers.get("x-client-email");
+    if (!clientEmail) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await req.json();
     const { section, ...settings } = body;
 
     await dbConnect();
 
-    let client = await Client.findOne({ email: "contact@solobuildai.com" }).select("+vobiz.authToken +geminiApiKey");
-    if (!client) {
-      client = await Client.findOne().select("+vobiz.authToken +geminiApiKey");
-    }
+    let client = await Client.findOne({ email: clientEmail }).select("+vobiz.authToken +geminiApiKey");
 
     if (!client) {
       return NextResponse.json({ error: "Client not found" }, { status: 404 });

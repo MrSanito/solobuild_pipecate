@@ -10,9 +10,30 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { callVolumeData } from "@/lib/mock-data";
+import { useCampaigns } from "@/lib/campaign-store";
 
 export function CallVolumeChart() {
+  const { callLogs } = useCampaigns();
+
+  // Generate last 7 days data
+  const chartData = Array.from({ length: 7 }).map((_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (6 - i));
+    const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    
+    // Filter calls for this day
+    const dayCalls = callLogs.filter(call => {
+      const callDate = new Date(call.callDate);
+      return callDate.getDate() === d.getDate() && callDate.getMonth() === d.getMonth();
+    });
+
+    return {
+      date: dateStr,
+      calls: dayCalls.length,
+      connected: dayCalls.filter(c => c.status === "Completed").length
+    };
+  });
+
   return (
     <Card className="border-border bg-card">
       <CardHeader className="pb-2">
@@ -37,7 +58,7 @@ export function CallVolumeChart() {
         <div className="h-[300px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart
-              data={callVolumeData}
+              data={chartData}
               margin={{ top: 8, right: 8, left: -15, bottom: 0 }}
             >
               <defs>

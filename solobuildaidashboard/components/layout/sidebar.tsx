@@ -3,6 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import toast from "react-hot-toast";
+import { fetchWithAuth } from "@/lib/api";
 import {
   LayoutDashboard,
   Megaphone,
@@ -55,7 +57,7 @@ export function Sidebar() {
     setStatusMessage("Connecting to Vobiz carrier...");
 
     try {
-      const response = await fetch("/api/call/initiate", {
+      const response = await fetchWithAuth("/api/call/initiate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

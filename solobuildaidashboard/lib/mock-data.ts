@@ -13,9 +13,15 @@ export const callVolumeData: { date: string; calls: number; connected: number }[
 export interface Agent {
   id: string;
   name: string;
-  gender: "Male" | "Female";
-  status: "Active" | "Inactive" | "Busy";
-  totalCalls: number;
+  agentName?: string;
+  orgName?: string;
+  prompt?: string;
+  voice?: string;
+  language?: string;
+  welcomeMessage?: string;
+  gender?: "Male" | "Female";
+  status?: "Active" | "Inactive" | "Busy";
+  totalCalls?: number;
   avatar?: string;
 }
 

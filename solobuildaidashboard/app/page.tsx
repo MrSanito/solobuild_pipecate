@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { UserPlus, FilePlus2, Phone, Delete } from "lucide-react";
+import { useState, useEffect } from "react";
+import toast from "react-hot-toast";
+import { fetchWithAuth } from "@/lib/api";
+import { UserPlus, FilePlus2, Phone, Delete, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { KPICards } from "@/components/dashboard/kpi-cards";
 import { CallVolumeChart } from "@/components/dashboard/call-volume-chart";
@@ -18,11 +20,19 @@ export default function DashboardPage() {
   const [isAgentOpen, setIsAgentOpen] = useState(false);
   
   // Dialer states
-  const { refreshCallLogs } = useCampaigns();
+  const { refreshCallLogs, refreshAgents, agents } = useCampaigns();
   const [isDialerOpen, setIsDialerOpen] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [selectedAgentId, setSelectedAgentId] = useState("");
   const [callingState, setCallingState] = useState<"idle" | "calling" | "success" | "error">("idle");
   const [statusMessage, setStatusMessage] = useState("");
+
+  // Default select first agent if none is selected
+  useEffect(() => {
+    if (!selectedAgentId && agents.length > 0) {
+      setSelectedAgentId(agents[0].id);
+    }
+  }, [agents, selectedAgentId]);
 
   const handleKeyPress = (num: string) => {
     setPhoneNumber((prev) => prev + num);
@@ -43,13 +53,14 @@ export default function DashboardPage() {
     setStatusMessage("Connecting to Vobiz carrier...");
 
     try {
-      const response = await fetch("/api/call/initiate", {
+      const response = await fetchWithAuth("/api/call/initiate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           phoneNumber: phoneNumber,
+          agentId: selectedAgentId,
         }),
       });
 
@@ -69,9 +80,25 @@ export default function DashboardPage() {
     }
   };
 
-  const handleSaveAgent = (agent: any) => {
-    console.log("Saving new agent from dashboard:", agent);
-    alert(`Voice Agent "${agent.name}" saved successfully!`);
+  const handleSaveAgent = async (agent: any) => {
+    try {
+      const res = await fetchWithAuth("/api/agents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(agent),
+      });
+
+      if (res.ok) {
+        await refreshAgents();
+        toast.success(`Voice Agent "${agent.name}" saved successfully!`);
+      } else {
+        const data = await res.json();
+        toast.error(`Failed to save agent: ${data.error || "Unknown error"}`);
+      }
+    } catch (error) {
+      console.error("Failed to save agent", error);
+      toast.error("Failed to save agent");
+    }
   };
 
   return (
@@ -183,6 +210,21 @@ export default function DashboardPage() {
             )}
           </div>
 
+          <div className="w-full mb-4 px-4">
+            <select
+              value={selectedAgentId}
+              onChange={(e) => setSelectedAgentId(e.target.value)}
+              className="w-full bg-neutral-900 border border-border text-sm text-white rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            >
+              {agents.length === 0 && <option value="">No agents available</option>}
+              {agents.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name} ({a.agentName})
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Keypad Grid */}
           <div className="grid grid-cols-3 gap-3 w-full mb-4">
             {["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"].map((key) => (
@@ -224,8 +266,8 @@ export default function DashboardPage() {
               disabled={!phoneNumber || callingState === "calling"}
               className="flex-1 h-10 bg-emerald-600 hover:bg-emerald-700 text-white text-xs rounded-xl gap-2 font-semibold cursor-pointer"
             >
-              <Phone className="h-3.5 w-3.5" />
-              Call
+              {callingState === "calling" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Phone className="h-3.5 w-3.5" />}
+              {callingState === "calling" ? "Calling..." : "Call"}
             </Button>
           </div>
         </DialogContent>

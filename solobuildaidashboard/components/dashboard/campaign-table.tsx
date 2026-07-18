@@ -80,46 +80,54 @@ export function CampaignTable({ onAddCampaignClick }: CampaignTableProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {campaigns.map((campaign) => (
-                <TableRow 
-                  key={campaign.id} 
-                  className="group cursor-pointer hover:bg-muted/50 transition-colors border-border"
-                  onClick={() => setSelectedCampaign(campaign)}
-                >
-                  <TableCell className="font-medium text-foreground text-[13px]">
-                    {campaign.name}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-[13px]">{campaign.assignedAgent}</TableCell>
-                  <TableCell>
-                    <span className="inline-flex items-center rounded-full bg-slate-800 px-2.5 py-0.5 text-[11px] font-medium text-slate-300 border border-slate-700">
-                      {campaign.purpose}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-[13px]">
-                    {new Date(campaign.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-[13px]">
-                    {new Date(campaign.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={getCampaignStatusVariant(campaign.status)}>
-                      <span className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${getStatusDot(campaign.status)}`} />
-                      {campaign.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-xs text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => setSelectedCampaign(campaign)}
-                    >
-                      Details
-                      <ArrowRight className="h-3 w-3" />
-                    </Button>
+              {campaigns.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                    No campaigns found.
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                campaigns.map((campaign) => (
+                  <TableRow 
+                    key={campaign.id} 
+                    className="group cursor-pointer hover:bg-muted/50 transition-colors border-border"
+                    onClick={() => setSelectedCampaign(campaign)}
+                  >
+                    <TableCell className="font-medium text-foreground text-[13px]">
+                      {campaign.name}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-[13px]">{campaign.assignedAgent}</TableCell>
+                    <TableCell>
+                      <span className="inline-flex items-center rounded-full bg-slate-800 px-2.5 py-0.5 text-[11px] font-medium text-slate-300 border border-slate-700">
+                        {campaign.purpose}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-[13px]">
+                      {new Date(campaign.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-[13px]">
+                      {new Date(campaign.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={getCampaignStatusVariant(campaign.status)}>
+                        <span className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${getStatusDot(campaign.status)}`} />
+                        {campaign.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => setSelectedCampaign(campaign)}
+                      >
+                        Details
+                        <ArrowRight className="h-3 w-3" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>

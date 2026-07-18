@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Search, MoreHorizontal, Eye, Pause, Trash2, Phone, CheckCircle, Clock, Save, Edit3, Settings } from "lucide-react";
+import toast from "react-hot-toast";
+import { fetchWithAuth } from "@/lib/api";
+import { Plus, Search, MoreHorizontal, Eye, Pause, Trash2, Phone, CheckCircle, Clock, Save, Edit3, Settings, Users } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -60,6 +62,7 @@ export default function AgentsPage() {
   const [isOpen, setIsOpen] = useState(false);
   const [editingAgent, setEditingAgent] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     fetchAgents();
@@ -68,7 +71,7 @@ export default function AgentsPage() {
   const fetchAgents = async () => {
     try {
       setIsLoading(true);
-      const res = await fetch('/api/agents');
+      const res = await fetchWithAuth('/api/agents');
       if (res.ok) {
         const data = await res.json();
         setAgentsList(Array.isArray(data) ? data : []);
@@ -123,7 +126,7 @@ export default function AgentsPage() {
     const trimmedPrompt = prompt.trim();
 
     if (!trimmedName || !trimmedAgentName || !trimmedOrgName) {
-      alert("Please fill in Name, Agent Name and Org Name.");
+      toast.error("Please fill in Name, Agent Name and Org Name.");
       return;
     }
 
@@ -139,8 +142,9 @@ export default function AgentsPage() {
       temperature
     };
 
+    setIsSaving(true);
     try {
-      const res = await fetch('/api/agents', {
+      const res = await fetchWithAuth('/api/agents', {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -149,13 +153,16 @@ export default function AgentsPage() {
       if (res.ok) {
         await fetchAgents();
         setIsOpen(false);
+        toast.success(editingAgent ? "Agent updated successfully!" : "Agent added successfully!");
       } else {
         const data = await res.json();
-        alert(`Failed to save agent: ${data.error || "Unknown error"}`);
+        toast.error(`Failed to save agent: ${data.error || "Unknown error"}`);
       }
     } catch (error) {
       console.error("Failed to save agent", error);
-      alert("Failed to save agent");
+      toast.error("Failed to save agent");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -168,17 +175,19 @@ export default function AgentsPage() {
       }
       
       try {
-        const res = await fetch(`/api/agents/${id}`, {
+        const res = await fetchWithAuth(`/api/agents/${id}`, {
           method: "DELETE"
         });
         if (res.ok) {
           setAgentsList(agentsList.filter(a => a.id !== id));
+          toast.success("Agent removed.");
         } else {
           const data = await res.json();
-          alert(`Failed to delete agent: ${data.error || "Unknown error"}`);
+          toast.error(`Failed to delete agent: ${data.error || "Unknown error"}`);
         }
       } catch (error) {
         console.error("Failed to delete agent", error);
+        toast.error("Failed to delete agent");
       }
     }
   };
@@ -207,79 +216,91 @@ export default function AgentsPage() {
       </div>
 
       {/* Agent Cards Grid */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {agentsList.map((agent, i) => (
-          <Card key={agent.id} className="card-hover border-border bg-card overflow-hidden group">
-            <CardContent className="p-0">
-              {/* Colored Top Bar */}
-              <div className={`h-1.5 bg-gradient-to-r ${avatarColors[i % avatarColors.length]}`} />
+      {agentsList.length === 0 ? (
+        <div className="flex flex-col items-center justify-center p-12 text-center rounded-xl border border-dashed border-border bg-card">
+          <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4">
+            <Users className="h-6 w-6 text-muted-foreground" />
+          </div>
+          <h3 className="text-sm font-semibold text-foreground">No agents found</h3>
+          <p className="mt-1 text-xs text-muted-foreground max-w-sm">
+            You haven't configured any voice agents yet. Click "Add Agent" to get started.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {agentsList.map((agent, i) => (
+            <Card key={agent.id} className="card-hover border-border bg-card overflow-hidden group">
+              <CardContent className="p-0">
+                {/* Colored Top Bar */}
+                <div className={`h-1.5 bg-gradient-to-r ${avatarColors[i % avatarColors.length]}`} />
 
-              <div className="p-5">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className={`flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br ${avatarColors[i % avatarColors.length]} text-[13px] font-bold text-white shadow-sm`}>
-                      {agent.name.split(" ").map((n: string) => n[0]).join("")}
+                <div className="p-5">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br ${avatarColors[i % avatarColors.length]} text-[13px] font-bold text-white shadow-sm`}>
+                        {agent.name.split(" ").map((n: string) => n[0]).join("")}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-foreground text-[14px]">{agent.name}</p>
+                        <p className="text-[11px] text-muted-foreground font-mono font-medium opacity-80 mt-0.5">{agent.agentName}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-semibold text-foreground text-[14px]">{agent.name}</p>
-                      <p className="text-[11px] text-muted-foreground font-mono font-medium opacity-80 mt-0.5">{agent.agentName}</p>
-                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleOpenEdit(agent)} className="cursor-pointer">
+                          <Settings className="mr-2 h-3.5 w-3.5" />Configure
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleDelete(agent.id)} className="text-red-600 cursor-pointer">
+                          <Trash2 className="mr-2 h-3.5 w-3.5" />Remove
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => handleOpenEdit(agent)} className="cursor-pointer">
-                        <Settings className="mr-2 h-3.5 w-3.5" />Configure
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleDelete(agent.id)} className="text-red-600 cursor-pointer">
-                        <Trash2 className="mr-2 h-3.5 w-3.5" />Remove
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
 
-                {/* Status */}
-                <div className="mb-4 flex items-center justify-between">
-                  <Badge variant={agent.status === "Active" ? "success" : agent.status === "Busy" ? "warning" : "secondary"}>
-                    <span className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${getStatusDot(agent.status)}`} />
-                    {agent.status}
-                  </Badge>
-                  <span className="text-[11px] text-muted-foreground font-mono">{agent.voice} • {agent.language}</span>
-                </div>
+                  {/* Status */}
+                  <div className="mb-4 flex items-center justify-between">
+                    <Badge variant={agent.status === "Active" ? "success" : agent.status === "Busy" ? "warning" : "secondary"}>
+                      <span className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${getStatusDot(agent.status)}`} />
+                      {agent.status}
+                    </Badge>
+                    <span className="text-[11px] text-muted-foreground font-mono">{agent.voice} • {agent.language}</span>
+                  </div>
 
-                {/* Stats */}
-                <div className="grid grid-cols-3 gap-3 rounded-xl bg-muted/50 p-3">
-                  <div className="text-center">
-                    <div className="flex items-center justify-center gap-1 mb-0.5">
-                      <Phone className="h-3 w-3 text-muted-foreground" />
+                  {/* Stats */}
+                  <div className="grid grid-cols-3 gap-3 rounded-xl bg-muted/50 p-3">
+                    <div className="text-center">
+                      <div className="flex items-center justify-center gap-1 mb-0.5">
+                        <Phone className="h-3 w-3 text-muted-foreground" />
+                      </div>
+                      <p className="text-[15px] font-bold text-foreground">{(agent.totalCalls || 0).toLocaleString()}</p>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Calls</p>
                     </div>
-                    <p className="text-[15px] font-bold text-foreground">{agent.totalCalls.toLocaleString()}</p>
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Calls</p>
-                  </div>
-                  <div className="text-center border-x border-border">
-                    <div className="flex items-center justify-center gap-1 mb-0.5">
-                      <CheckCircle className="h-3 w-3 text-muted-foreground" />
+                    <div className="text-center border-x border-border">
+                      <div className="flex items-center justify-center gap-1 mb-0.5">
+                        <CheckCircle className="h-3 w-3 text-muted-foreground" />
+                      </div>
+                      <p className="text-[15px] font-bold text-foreground">{(agent.connectedCalls || 0).toLocaleString()}</p>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Connected</p>
                     </div>
-                    <p className="text-[15px] font-bold text-foreground">{(agent.connectedCalls || 0).toLocaleString()}</p>
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Connected</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="flex items-center justify-center gap-1 mb-0.5">
-                      <Clock className="h-3 w-3 text-muted-foreground" />
+                    <div className="text-center">
+                      <div className="flex items-center justify-center gap-1 mb-0.5">
+                        <Clock className="h-3 w-3 text-muted-foreground" />
+                      </div>
+                      <p className="text-[15px] font-bold text-foreground">{Math.floor((agent.talkTimeSeconds || 0) / 60)}m {(agent.talkTimeSeconds || 0) % 60}s</p>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Talk Time</p>
                     </div>
-                    <p className="text-[15px] font-bold text-foreground">{Math.floor((agent.talkTimeSeconds || 0) / 60)}m {(agent.talkTimeSeconds || 0) % 60}s</p>
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Talk Time</p>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* Dialog for Add/Edit Agent */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -350,10 +371,19 @@ export default function AgentsPage() {
           </div>
 
           <DialogFooter className="border-t border-border/60 pt-4 gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setIsOpen(false)} className="text-xs rounded-lg">Cancel</Button>
-            <Button size="sm" onClick={handleSave} className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs rounded-lg gap-1.5 cursor-pointer">
-              <Save className="h-3.5 w-3.5" />
-              Save Settings
+            <Button variant="ghost" size="sm" onClick={() => setIsOpen(false)} className="text-xs rounded-lg" disabled={isSaving}>Cancel</Button>
+            <Button size="sm" onClick={handleSave} className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs rounded-lg gap-1.5 cursor-pointer" disabled={isSaving}>
+              {isSaving ? (
+                <>
+                  <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-3.5 w-3.5" />
+                  Save Settings
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

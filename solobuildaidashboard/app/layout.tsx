@@ -5,6 +5,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { Navbar } from "@/components/layout/navbar";
 import { CampaignProvider } from "@/lib/campaign-store";
 import { AuthWrapper } from "@/components/layout/auth-wrapper";
+import { Toaster } from "react-hot-toast";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -45,8 +46,8 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.className} antialiased`}>
-        <CampaignProvider>
-          <AuthWrapper>
+        <AuthWrapper>
+          <CampaignProvider>
             <div className="flex min-h-screen">
               <Sidebar />
               <div className="flex-1 pl-64">
@@ -54,8 +55,9 @@ export default function RootLayout({
                 <main className="p-8 page-enter">{children}</main>
               </div>
             </div>
-          </AuthWrapper>
-        </CampaignProvider>
+          </CampaignProvider>
+        </AuthWrapper>
+        <Toaster position="top-right" />
       </body>
     </html>
   );

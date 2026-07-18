@@ -1,17 +1,26 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
 import { Agent, Client } from "@/lib/models";
+import { verifyToken } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     await dbConnect();
     
-    // In a real app we'd get the clientId from session
-    // For now, use a default client or the first one
-    let client = await Client.findOne({ email: "contact@solobuildai.com" });
-    if (!client) {
-      client = await Client.findOne();
+    const authHeader = req.headers.get("authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const token = authHeader.split(" ")[1];
+    const decoded = await verifyToken(token);
+    
+    if (!decoded) {
+      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+    }
+
+    const clientEmail = decoded.email;
+
+    const client = await Client.findOne({ email: clientEmail });
     
     if (!client) {
       return NextResponse.json([]);
@@ -64,10 +73,20 @@ export async function POST(req: Request) {
   try {
     await dbConnect();
     
-    let client = await Client.findOne({ email: "contact@solobuildai.com" });
-    if (!client) {
-      client = await Client.findOne();
+    const authHeader = req.headers.get("authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const token = authHeader.split(" ")[1];
+    const decoded = await verifyToken(token);
+    
+    if (!decoded) {
+      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+    }
+
+    const clientEmail = decoded.email;
+
+    const client = await Client.findOne({ email: clientEmail });
     
     if (!client) {
       return NextResponse.json({ error: "No client found" }, { status: 400 });

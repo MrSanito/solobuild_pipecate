@@ -1,15 +1,16 @@
 "use client";
 
 import React, { useState } from "react";
-import { Save } from "lucide-react";
+import { Save, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import toast from "react-hot-toast";
 
 interface NewAgentModalProps {
   open: boolean;
   onClose: () => void;
-  onSave?: (agent: any) => void;
+  onSave?: (agent: any) => Promise<void> | void;
 }
 
 export function NewAgentModal({ open, onClose, onSave }: NewAgentModalProps) {
@@ -21,8 +22,9 @@ export function NewAgentModal({ open, onClose, onSave }: NewAgentModalProps) {
   const [language, setLanguage] = useState("hi-IN");
   const [aiModel, setAiModel] = useState("gemini-3.1-flash-live-preview");
   const [temperature, setTemperature] = useState(0.6);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedName = name.trim();
     const trimmedAgentName = agentName.trim();
@@ -30,12 +32,13 @@ export function NewAgentModal({ open, onClose, onSave }: NewAgentModalProps) {
     const trimmedPrompt = prompt.trim();
 
     if (!trimmedName || !trimmedAgentName || !trimmedOrgName) {
-      alert("Please fill in Display Name, Agent ID, and Organization Name.");
+      toast.error("Please fill in Display Name, Agent ID, and Organization Name.");
       return;
     }
 
+    setIsSubmitting(true);
     if (onSave) {
-      onSave({
+      await onSave({
         name: trimmedName,
         agentName: trimmedAgentName,
         orgName: trimmedOrgName,
@@ -46,6 +49,7 @@ export function NewAgentModal({ open, onClose, onSave }: NewAgentModalProps) {
         temperature,
       });
     }
+    setIsSubmitting(false);
 
     // Reset
     setName("");
@@ -125,10 +129,10 @@ export function NewAgentModal({ open, onClose, onSave }: NewAgentModalProps) {
           </div>
 
           <DialogFooter className="border-t border-border/60 pt-4 gap-2">
-            <Button type="button" variant="ghost" size="sm" onClick={onClose} className="text-xs rounded-lg">Cancel</Button>
-            <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs rounded-lg gap-1.5">
-              <Save className="h-3.5 w-3.5" />
-              Save Agent
+            <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={isSubmitting} className="text-xs rounded-lg">Cancel</Button>
+            <Button type="submit" disabled={isSubmitting} className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs rounded-lg gap-1.5">
+              {isSubmitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+              {isSubmitting ? "Saving..." : "Save Agent"}
             </Button>
           </DialogFooter>
         </form>

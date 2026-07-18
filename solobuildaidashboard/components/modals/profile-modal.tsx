@@ -4,7 +4,9 @@ import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import toast from "react-hot-toast";
 import { Globe, Phone, Brain, Eye, EyeOff, Loader2, Save, User } from "lucide-react";
+import { fetchWithAuth } from "@/lib/api";
 
 interface ProfileModalProps {
   open: boolean;
@@ -54,7 +56,7 @@ export function ProfileModal({ open, onClose, defaultTab = "general" }: ProfileM
     async function fetchSettings() {
       setLoading(true);
       try {
-        const response = await fetch("/api/settings");
+        const response = await fetchWithAuth("/api/settings");
         if (response.ok) {
           const clientData = await response.json();
           setName(clientData.name || "");
@@ -119,21 +121,21 @@ export function ProfileModal({ open, onClose, defaultTab = "general" }: ProfileM
     }
 
     try {
-      const response = await fetch("/api/settings", {
+      const response = await fetchWithAuth("/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
       if (response.ok) {
-        alert(`${section} settings saved successfully!`);
+        toast.success(`${section} settings saved successfully!`);
         onClose();
       } else {
         const errData = await response.json();
-        alert(`Failed to save settings: ${errData.error || "Unknown error"}`);
+        toast.error(`Failed to save settings: ${errData.error || "Unknown error"}`);
       }
     } catch (err: any) {
-      alert(`Error saving settings: ${err.message}`);
+      toast.error(`Error saving settings: ${err.message}`);
     } finally {
       setSaving(false);
     }
@@ -141,13 +143,13 @@ export function ProfileModal({ open, onClose, defaultTab = "general" }: ProfileM
 
   const handleTestGemini = async () => {
     if (!geminiApiKey.trim()) {
-      alert("Please enter a Gemini API Key first.");
+      toast.error("Please enter a Gemini API Key first.");
       return;
     }
 
     setTestingGemini(true);
     try {
-      const response = await fetch("/api/settings/test-gemini", {
+      const response = await fetchWithAuth("/api/settings/test-gemini", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ apiKey: geminiApiKey.trim() }),
@@ -155,12 +157,12 @@ export function ProfileModal({ open, onClose, defaultTab = "general" }: ProfileM
 
       const data = await response.json();
       if (response.ok && data.success) {
-        alert("Success: Gemini API key is valid and connected!");
+        toast.success("Success: Gemini API key is valid and connected!");
       } else {
-        alert(`Error testing key: ${data.error || "Failed to validate key"}`);
+        toast.error(`Error testing key: ${data.error || "Failed to validate key"}`);
       }
     } catch (err: any) {
-      alert(`Connection failed: ${err.message}`);
+      toast.error(`Connection failed: ${err.message}`);
     } finally {
       setTestingGemini(false);
     }

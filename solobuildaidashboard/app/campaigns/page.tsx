@@ -251,7 +251,14 @@ export default function CampaignsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredCampaigns.map((campaign) => {
+              {filteredCampaigns.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
+                    No campaigns found.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredCampaigns.map((campaign) => {
                 const campaignLeadsCount = callLogs.filter(log => log.campaign === campaign.name).length;
                 return (
                   <TableRow key={campaign.id} className="group">
@@ -291,7 +298,8 @@ export default function CampaignsPage() {
                     </TableCell>
                   </TableRow>
                 );
-              })}
+              })
+            )}
             </TableBody>
           </Table>
         </CardContent>

@@ -1,13 +1,14 @@
 "use client";
 
 import React, { useState, useRef } from "react";
-import { Phone, PhoneOff, CheckCircle, TrendingUp, UserCog, Upload, Download, FileSpreadsheet, AlertCircle, Check } from "lucide-react";
+import { Phone, PhoneOff, CheckCircle, TrendingUp, UserCog, Upload, Download, FileSpreadsheet, AlertCircle, Check, Loader2 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { fetchWithAuth } from "@/lib/api";
 import { useCampaigns } from "@/lib/campaign-store";
 import type { Campaign } from "@/lib/mock-data";
 import * as XLSX from "xlsx";
@@ -96,7 +97,7 @@ export function CampaignDetailModal({ campaign, open, onClose }: CampaignDetailM
     setCallErrorMessage(null);
 
     try {
-      const response = await fetch("/api/call/initiate", {
+      const response = await fetchWithAuth("/api/call/initiate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -210,7 +211,7 @@ export function CampaignDetailModal({ campaign, open, onClose }: CampaignDetailM
         addLeadsToCampaign(campaign.id, parsed);
         
         if (autoSchedule) {
-          fetch("/api/call/schedule", {
+          fetchWithAuth("/api/call/schedule", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -505,16 +506,16 @@ export function CampaignDetailModal({ campaign, open, onClose }: CampaignDetailM
                               </Badge>
                             </TableCell>
                             <TableCell className="py-2 text-right">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                disabled={callingLeadId !== null}
-                                onClick={() => handleInitiateCall(lead.phoneNumber, lead.id)}
-                                className="h-7 w-7 p-0 text-indigo-400 hover:text-indigo-300 rounded-lg"
-                                title="Call this contact"
-                              >
-                                <Phone className="h-3.5 w-3.5" />
-                              </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  disabled={callingLeadId !== null}
+                                  onClick={() => handleInitiateCall(lead.phoneNumber, lead.id)}
+                                  className="h-7 w-7 p-0 text-indigo-400 hover:text-indigo-300 rounded-lg"
+                                  title="Call this contact"
+                                >
+                                  {callingLeadId === lead.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Phone className="h-3.5 w-3.5" />}
+                                </Button>
                             </TableCell>
                           </TableRow>
                         ))}

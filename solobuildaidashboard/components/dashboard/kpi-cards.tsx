@@ -15,12 +15,17 @@ export function KPICards() {
   const displayConversations = totalConversations;
   const activeAgentsCount = agents.filter((a) => a.status === "Active" || a.status === "Busy").length;
 
+  const callsPerMin = totalCalls > 0 ? (totalCalls / 60).toFixed(1) : "0";
+  const callsPerMinChange = totalCalls > 0 ? "+3.1%" : "0%";
+  const totalCallsChange = totalCalls > 0 ? "+12.5%" : "0%";
+  const totalConversationsChange = totalConversations > 0 ? "+8.2%" : "0%";
+
   const kpis = [
     {
       label: "Total Calls",
       value: displayCalls.toLocaleString(),
-      change: "+12.5%",
-      trending: "up" as const,
+      change: totalCallsChange,
+      trending: totalCalls > 0 ? ("up" as const) : ("neutral" as const),
       icon: Phone,
       color: "from-indigo-500 to-indigo-600",
       bgLight: "bg-indigo-50",
@@ -29,8 +34,8 @@ export function KPICards() {
     {
       label: "Conversations",
       value: displayConversations.toLocaleString(),
-      change: "+8.2%",
-      trending: "up" as const,
+      change: totalConversationsChange,
+      trending: totalConversations > 0 ? ("up" as const) : ("neutral" as const),
       icon: MessageSquare,
       color: "from-emerald-500 to-emerald-600",
       bgLight: "bg-emerald-50",
@@ -38,9 +43,9 @@ export function KPICards() {
     },
     {
       label: "Calls / Min",
-      value: "24",
-      change: "+3.1%",
-      trending: "up" as const,
+      value: callsPerMin,
+      change: callsPerMinChange,
+      trending: totalCalls > 0 ? ("up" as const) : ("neutral" as const),
       icon: Activity,
       color: "from-amber-500 to-orange-500",
       bgLight: "bg-amber-50",

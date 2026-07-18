@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { MoreHorizontal, Eye, Pause, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +36,7 @@ interface AgentTableProps {
 }
 
 export function AgentTable({ onAddAgentClick }: AgentTableProps) {
+  const router = useRouter();
   const { agents } = useCampaigns();
   return (
     <Card className="border-border bg-card">
@@ -68,48 +70,57 @@ export function AgentTable({ onAddAgentClick }: AgentTableProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {agents.map((agent, i) => (
-              <TableRow 
-                key={agent.id} 
-                className="group cursor-pointer hover:bg-muted/50 transition-colors border-border"
-              >
-                <TableCell>
-                  <div className="flex items-center gap-3">
-                    <div className={`flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br ${avatarColors[i % avatarColors.length]} text-[11px] font-bold text-white shadow-sm`}>
-                      {agent.name.split(" ").map(n => n[0]).join("")}
-                    </div>
-                    <span className="font-medium text-foreground text-[13px]">{agent.name}</span>
-                  </div>
-                </TableCell>
-                <TableCell className="text-muted-foreground text-[13px]">{agent.gender}</TableCell>
-                <TableCell>
-                  <Badge variant={getStatusVariant(agent.status)}>
-                    <span className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${
-                      agent.status === "Active" ? "bg-emerald-500" :
-                      agent.status === "Busy" ? "bg-amber-500" : "bg-slate-400"
-                    }`} />
-                    {agent.status}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <span className="font-semibold text-foreground text-[13px]">{agent.totalCalls.toLocaleString()}</span>
-                </TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem><Eye className="mr-2 h-3.5 w-3.5" />View Details</DropdownMenuItem>
-                      <DropdownMenuItem><Pause className="mr-2 h-3.5 w-3.5" />Pause Agent</DropdownMenuItem>
-                      <DropdownMenuItem className="text-red-600"><Trash2 className="mr-2 h-3.5 w-3.5" />Remove</DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+            {agents.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                  No agents found.
                 </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              agents.map((agent, i) => (
+                <TableRow 
+                  key={agent.id} 
+                  onClick={() => router.push('/agents')}
+                  className="group cursor-pointer hover:bg-muted/50 transition-colors border-border"
+                >
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <div className={`flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br ${avatarColors[i % avatarColors.length]} text-[11px] font-bold text-white shadow-sm`}>
+                        {agent.name.split(" ").map(n => n[0]).join("")}
+                      </div>
+                      <span className="font-medium text-foreground text-[13px]">{agent.name}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-[13px]">{agent.gender || "—"}</TableCell>
+                  <TableCell>
+                    <Badge variant={getStatusVariant(agent.status || "Inactive")}>
+                      <span className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${
+                        (agent.status || "Inactive") === "Active" ? "bg-emerald-500" :
+                        (agent.status || "Inactive") === "Busy" ? "bg-amber-500" : "bg-slate-400"
+                      }`} />
+                      {agent.status || "Inactive"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <span className="font-semibold text-foreground text-[13px]">{(agent.totalCalls || 0).toLocaleString()}</span>
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem><Eye className="mr-2 h-3.5 w-3.5" />View Details</DropdownMenuItem>
+                        <DropdownMenuItem><Pause className="mr-2 h-3.5 w-3.5" />Pause Agent</DropdownMenuItem>
+                        <DropdownMenuItem className="text-red-600"><Trash2 className="mr-2 h-3.5 w-3.5" />Remove</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </CardContent>

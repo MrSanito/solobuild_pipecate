@@ -9,6 +9,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing or invalid 'leads' array" }, { status: 400 });
     }
 
+    const clientEmail = req.headers.get("x-client-email");
+    if (!clientEmail) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     // Determine target host URL for /api/call/initiate
     const host = req.headers.get("host") || "localhost:7860";
     const proto = req.headers.get("x-forwarded-proto") || "http";
@@ -35,6 +40,9 @@ export async function POST(req: Request) {
             phoneNumber: lead.phoneNumber || lead.phone,
             campaignId: campaignId || lead.campaignId,
             contactId: lead.id || lead.contactId,
+          },
+          headers: {
+            "x-client-email": clientEmail,
           },
           delay: delayString as any,
         });

@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
-import { Client, Call } from "@/lib/models";
+import { Client, Call, Agent } from "@/lib/models";
+import { verifyToken } from "@/lib/auth";
 
 export async function POST(req: Request) {
   try {
-    const { phoneNumber, campaignId, contactId } = await req.json();
+    const { phoneNumber, campaignId, contactId, agentId } = await req.json();
 
     if (!phoneNumber) {
       return NextResponse.json({ error: "Missing 'phoneNumber' in the request body" }, { status: 400 });
@@ -14,35 +15,27 @@ export async function POST(req: Request) {
 
     await dbConnect();
 
-    // Find the client with email contact@solobuildai.com to fetch credentials
-    let client = await Client.findOne({ email: "contact@solobuildai.com" }).select("+vobiz.authToken");
-    if (!client) {
-      // Fallback to any client if contact@solobuildai.com isn't present
-      client = await Client.findOne().select("+vobiz.authToken");
+    const authHeader = req.headers.get("authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const token = authHeader.split(" ")[1];
+    const decoded = await verifyToken(token);
+    
+    if (!decoded) {
+      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
-    // Self-healing: If no client exists in the DB, create a default client using env variables
+    const clientEmail = decoded.email;
+
+    const client = await Client.findOne({ email: clientEmail }).select("+vobiz.authToken");
+    
     if (!client) {
-      const envAuthId = process.env.VOBIZ_AUTH_ID;
-      const envAuthToken = process.env.VOBIZ_AUTH_TOKEN;
-      const envPhone = process.env.VOBIZ_PHONE_NUMBER;
+      return NextResponse.json({ error: "No client found" }, { status: 400 });
+    }
 
-      if (!envAuthId || !envAuthToken) {
-        return NextResponse.json({ error: "Vobiz Auth configuration is missing from environment variables" }, { status: 400 });
-      }
-
-      client = await Client.create({
-        name: "Solobuild AI User",
-        slug: "solobuild-ai-user",
-        email: "contact@solobuildai.com",
-        passwordHash: "placeholder_hash_value", // required by ClientSchema
-        vobiz: {
-          authId: envAuthId,
-          authToken: envAuthToken,
-          phoneNumber: envPhone,
-        }
-      });
-      console.log(`[INITIATE] Database clients collection was empty. Created default client: ${client._id}`);
+    if (!client.vobiz || !client.vobiz.authId || !client.vobiz.authToken) {
+      return NextResponse.json({ error: "Vobiz configuration is missing for this client" }, { status: 400 });
     }
 
     const authId = client.vobiz?.authId || process.env.VOBIZ_AUTH_ID;
@@ -56,9 +49,19 @@ export async function POST(req: Request) {
     // Construct the Vobiz answer callback URL using Next.js request headers
     const host = req.headers.get("host") || "localhost:7860";
     const proto = req.headers.get("x-forwarded-proto") || "http";
-    const answerUrl = process.env.PUBLIC_URL 
+    let answerUrl = process.env.PUBLIC_URL 
       ? `${process.env.PUBLIC_URL.replace(/\/$/, "")}/api/call/answer` 
       : `${proto}://${host}/api/call/answer`;
+
+    if (agentId) {
+      const dbAgent = await Agent.findById(agentId);
+      if (dbAgent) {
+        // Pass both agentId, agentName and orgName via query params
+        answerUrl += `?agentId=${agentId}&agentName=${dbAgent.agentName}&orgName=${dbAgent.orgName}`;
+      } else {
+        answerUrl += `?agentId=${agentId}`;
+      }
+    }
 
     console.log(`[INITIATE] Triggering outbound Vobiz call. Target: ${sanitizedPhone}, Answer URL: ${answerUrl}`);
 
