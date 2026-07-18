@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Search, MoreHorizontal, Eye, Pause, Trash2, Phone, CheckCircle, Clock, Save, Edit3, Settings } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -56,9 +56,29 @@ function getStatusDot(status: string) {
 }
 
 export default function AgentsPage() {
-  const [agentsList, setAgentsList] = useState(initialAgents);
+  const [agentsList, setAgentsList] = useState<any[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [editingAgent, setEditingAgent] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetchAgents();
+  }, []);
+
+  const fetchAgents = async () => {
+    try {
+      setIsLoading(true);
+      const res = await fetch('/api/agents');
+      if (res.ok) {
+        const data = await res.json();
+        setAgentsList(Array.isArray(data) ? data : []);
+      }
+    } catch (error) {
+      console.error("Failed to fetch agents", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Form states
   const [name, setName] = useState("");
@@ -96,7 +116,7 @@ export default function AgentsPage() {
     setIsOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const trimmedName = name.trim();
     const trimmedAgentName = agentName.trim();
     const trimmedOrgName = orgName.trim();
@@ -107,43 +127,59 @@ export default function AgentsPage() {
       return;
     }
 
-    if (editingAgent) {
-      // Edit
-      setAgentsList(agentsList.map(a => a.id === editingAgent.id ? {
-        ...a,
-        name: trimmedName,
-        agentName: trimmedAgentName,
-        orgName: trimmedOrgName,
-        prompt: trimmedPrompt,
-        voice,
-        language,
-        aiModel,
-        temperature
-      } : a));
-    } else {
-      // Add
-      const newAgent = {
-        id: `a${Date.now()}`,
-        name: trimmedName,
-        gender: "Male" as const,
-        status: "Inactive" as const,
-        totalCalls: 0,
-        agentName: trimmedAgentName,
-        orgName: trimmedOrgName,
-        prompt: trimmedPrompt,
-        voice,
-        language,
-        aiModel,
-        temperature
-      };
-      setAgentsList([...agentsList, newAgent]);
+    const payload = {
+      id: editingAgent?.id && editingAgent.id.length === 24 ? editingAgent.id : undefined,
+      name: trimmedName,
+      agentName: trimmedAgentName,
+      orgName: trimmedOrgName,
+      prompt: trimmedPrompt,
+      voice,
+      language,
+      aiModel,
+      temperature
+    };
+
+    try {
+      const res = await fetch('/api/agents', {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      
+      if (res.ok) {
+        await fetchAgents();
+        setIsOpen(false);
+      } else {
+        const data = await res.json();
+        alert(`Failed to save agent: ${data.error || "Unknown error"}`);
+      }
+    } catch (error) {
+      console.error("Failed to save agent", error);
+      alert("Failed to save agent");
     }
-    setIsOpen(false);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm("Are you sure you want to remove this agent?")) {
-      setAgentsList(agentsList.filter(a => a.id !== id));
+      // If it's a dummy id from initial state, just remove it from local state
+      if (id.startsWith('a')) {
+        setAgentsList(agentsList.filter(a => a.id !== id));
+        return;
+      }
+      
+      try {
+        const res = await fetch(`/api/agents/${id}`, {
+          method: "DELETE"
+        });
+        if (res.ok) {
+          setAgentsList(agentsList.filter(a => a.id !== id));
+        } else {
+          const data = await res.json();
+          alert(`Failed to delete agent: ${data.error || "Unknown error"}`);
+        }
+      } catch (error) {
+        console.error("Failed to delete agent", error);
+      }
     }
   };
 
@@ -182,7 +218,7 @@ export default function AgentsPage() {
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <div className={`flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br ${avatarColors[i % avatarColors.length]} text-[13px] font-bold text-white shadow-sm`}>
-                      {agent.name.split(" ").map(n => n[0]).join("")}
+                      {agent.name.split(" ").map((n: string) => n[0]).join("")}
                     </div>
                     <div>
                       <p className="font-semibold text-foreground text-[14px]">{agent.name}</p>
@@ -228,14 +264,14 @@ export default function AgentsPage() {
                     <div className="flex items-center justify-center gap-1 mb-0.5">
                       <CheckCircle className="h-3 w-3 text-muted-foreground" />
                     </div>
-                    <p className="text-[15px] font-bold text-foreground">{Math.round(agent.totalCalls * 0.82).toLocaleString()}</p>
+                    <p className="text-[15px] font-bold text-foreground">{(agent.connectedCalls || 0).toLocaleString()}</p>
                     <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Connected</p>
                   </div>
                   <div className="text-center">
                     <div className="flex items-center justify-center gap-1 mb-0.5">
                       <Clock className="h-3 w-3 text-muted-foreground" />
                     </div>
-                    <p className="text-[15px] font-bold text-foreground">{(agent.totalCalls * 3.2 / 60).toFixed(0)}h</p>
+                    <p className="text-[15px] font-bold text-foreground">{Math.floor((agent.talkTimeSeconds || 0) / 60)}m {(agent.talkTimeSeconds || 0) % 60}s</p>
                     <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Talk Time</p>
                   </div>
                 </div>

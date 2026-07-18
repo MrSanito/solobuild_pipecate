@@ -3,7 +3,7 @@ import dbConnect from "@/lib/mongodb";
 import { Call, Client } from "@/lib/models";
 import fs from "fs";
 import path from "path";
-import { uploadRecording } from "@/lib/cloudinary";
+import { uploadRecording, uploadRecordingBuffer } from "@/lib/cloudinary";
 
 export async function POST(req: Request) {
   try {
@@ -61,21 +61,10 @@ export async function POST(req: Request) {
         const arrayBuffer = await fileResponse.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
 
-        // Ensure public/recordings directory exists
-        const dirPath = path.join(process.cwd(), "public", "recordings");
-        if (!fs.existsSync(dirPath)) {
-          fs.mkdirSync(dirPath, { recursive: true });
-        }
-
-        const filename = `${recordingId}.wav`;
-        const filePath = path.join(dirPath, filename);
-        fs.writeFileSync(filePath, buffer);
-        console.log(`[RECORDING] Recording saved locally to: ${filePath}`);
-
-        // Upload to Cloudinary
+        // Upload to Cloudinary directly from buffer
         let cloudinaryUrl = "";
         try {
-          cloudinaryUrl = await uploadRecording(filePath, recordingId);
+          cloudinaryUrl = await uploadRecordingBuffer(buffer, recordingId);
         } catch (cloudinaryErr) {
           console.error(`[RECORDING] Cloudinary upload failed:`, cloudinaryErr);
         }
@@ -85,7 +74,6 @@ export async function POST(req: Request) {
           callEntry.recordingId = recordingId;
           callEntry.recordingUri = recordUrl;
           callEntry.recordingCloudinaryUrl = cloudinaryUrl;
-          callEntry.recordingLocalPath = `/recordings/${filename}`;
           callEntry.callStatus = "completed";
           callEntry.endedAt = new Date();
           

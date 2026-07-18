@@ -12,9 +12,29 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "VoiceAI — AI Voice Calling Dashboard",
+  metadataBase: new URL('https://voiceai.example.com'),
+  title: {
+    default: "VoiceAI — AI Voice Calling Dashboard",
+    template: "%s | VoiceAI"
+  },
   description:
     "AI-powered voice calling dashboard for managing campaigns, agents, and call analytics.",
+  alternates: {
+    canonical: '/',
+  },
+  openGraph: {
+    title: "VoiceAI — AI Voice Calling Dashboard",
+    description: "AI-powered voice calling dashboard for managing campaigns, agents, and call analytics.",
+    url: 'https://voiceai.example.com',
+    siteName: 'VoiceAI',
+    locale: 'en_US',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: "VoiceAI — AI Voice Calling Dashboard",
+    description: "AI-powered voice calling dashboard for managing campaigns, agents, and call analytics.",
+  },
 };
 
 export default function RootLayout({

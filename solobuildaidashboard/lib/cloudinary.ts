@@ -21,3 +21,26 @@ export async function uploadRecording(filePath: string, publicId: string): Promi
     throw error;
   }
 }
+
+export function uploadRecordingBuffer(buffer: Buffer, publicId: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    console.log(`[CLOUDINARY] Uploading buffer to Cloudinary (publicId: ${publicId})...`);
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        resource_type: "video",
+        public_id: `recordings/${publicId}`,
+        overwrite: true,
+      },
+      (error, result) => {
+        if (error || !result) {
+          console.error("[CLOUDINARY] Upload stream failed:", error);
+          reject(error);
+        } else {
+          console.log(`[CLOUDINARY] Upload stream successful! Secure URL: ${result.secure_url}`);
+          resolve(result.secure_url);
+        }
+      }
+    );
+    uploadStream.end(buffer);
+  });
+}
