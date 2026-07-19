@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import toast from "react-hot-toast";
@@ -83,6 +83,30 @@ export function Sidebar() {
     }
   };
 
+  const [userName, setUserName] = useState("User");
+  const [userEmail, setUserEmail] = useState("");
+  const [userInitials, setUserInitials] = useState("U");
+
+  useEffect(() => {
+    const userStr = sessionStorage.getItem("solobuild_user");
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        setUserName(user.name || "User");
+        setUserEmail(user.email || "");
+        if (user.name) {
+          const initials = user.name
+            .split(" ")
+            .map((n: string) => n[0])
+            .join("")
+            .substring(0, 2)
+            .toUpperCase();
+          setUserInitials(initials || "U");
+        }
+      } catch (e) {}
+    }
+  }, []);
+
   return (
     <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col bg-sidebar border-r border-border">
       {/* Logo */}
@@ -142,32 +166,15 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Usage Card */}
-      <div className="mx-3 mb-3 rounded-xl bg-gradient-to-br from-primary/10 to-indigo-500/10 border border-primary/20 p-4">
-        <div className="flex items-center gap-2 mb-2">
-          <Zap className="h-4 w-4 text-primary" />
-          <span className="text-xs font-semibold text-primary">Usage</span>
-        </div>
-        <div className="mb-1.5">
-          <div className="flex justify-between text-[11px] text-slate-400 mb-1">
-            <span>API Calls</span>
-            <span>12.8k / 20k</span>
-          </div>
-          <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden">
-            <div className="h-full w-[64%] rounded-full bg-gradient-to-r from-primary to-indigo-500" />
-          </div>
-        </div>
-      </div>
-
       {/* Footer */}
       <div className="border-t border-slate-700/50 px-3 py-3">
         <div className="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-white/5 transition-colors cursor-pointer">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-[11px] font-bold text-white">
-            VK
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-[11px] font-bold text-white uppercase">
+            {userInitials}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="truncate text-sm font-medium text-sidebar-foreground">Vishal Kumar</p>
-            <p className="truncate text-[11px] text-muted-foreground">Admin</p>
+            <p className="truncate text-sm font-medium text-sidebar-foreground">{userName}</p>
+            <p className="truncate text-[11px] text-muted-foreground">{userEmail || "Admin"}</p>
           </div>
         </div>
       </div>

@@ -28,16 +28,14 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [callLogs, setCallLogs] = useState<CallLog[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
-  const [initialized, setInitialized] = useState(false);
+  const initialized = React.useRef(false);
 
   const refreshCallLogs = async () => {
     try {
       const res = await fetchWithAuth("/api/call");
       if (res.ok) {
         const dbLogs = await res.json();
-        if (Array.isArray(dbLogs)) {
-          setCallLogs(dbLogs);
-        }
+        if (Array.isArray(dbLogs)) setCallLogs(dbLogs);
       }
     } catch (err) {
       console.error("Failed to load logs from database:", err);
@@ -49,9 +47,7 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
       const res = await fetchWithAuth("/api/campaigns");
       if (res.ok) {
         const dbCampaigns = await res.json();
-        if (Array.isArray(dbCampaigns)) {
-          setCampaigns(dbCampaigns);
-        }
+        if (Array.isArray(dbCampaigns)) setCampaigns(dbCampaigns);
       }
     } catch (err) {
       console.error("Failed to load campaigns from database:", err);
@@ -63,9 +59,7 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
       const res = await fetchWithAuth("/api/agents");
       if (res.ok) {
         const dbAgents = await res.json();
-        if (Array.isArray(dbAgents) && dbAgents.length > 0) {
-          setAgents(dbAgents);
-        }
+        if (Array.isArray(dbAgents)) setAgents(dbAgents);
       }
     } catch (err) {
       console.error("Failed to load agents from database:", err);
@@ -74,16 +68,39 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
 
   // Load from database on mount
   useEffect(() => {
+    if (initialized.current) return;
+    initialized.current = true;
+
+    let isMounted = true;
+
     const loadInitialData = async () => {
-      await Promise.all([
-        refreshCampaigns(),
-        refreshCallLogs(),
-        refreshAgents()
-      ]);
-      setInitialized(true);
+      try {
+        const res = await fetchWithAuth("/api/dashboard");
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted) {
+            setCampaigns(data.campaigns || []);
+            setAgents(data.agents || []);
+            setCallLogs(data.callLogs || []);
+          }
+        } else {
+          // Fallback
+          await Promise.all([
+            refreshCampaigns(),
+            refreshCallLogs(),
+            refreshAgents()
+          ]);
+        }
+      } catch (err) {
+        console.error("Failed to load initial dashboard data:", err);
+      }
     };
     
     loadInitialData();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const addCampaign = async (

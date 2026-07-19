@@ -484,6 +484,7 @@ export function CampaignDetailModal({ campaign, open, onClose }: CampaignDetailM
                           <TableHead className="text-xs py-2 h-9">Company</TableHead>
                           <TableHead className="text-xs py-2 h-9">Phone Number</TableHead>
                           <TableHead className="text-xs py-2 h-9">Status</TableHead>
+                          <TableHead className="text-xs py-2 h-9">Sub Status</TableHead>
                           <TableHead className="text-xs py-2 h-9 text-right">Action</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -504,6 +505,18 @@ export function CampaignDetailModal({ campaign, open, onClose }: CampaignDetailM
                                 <span className={`mr-1 inline-block h-1 w-1 rounded-full ${getCallStatusDot(lead.status)}`} />
                                 {lead.status}
                               </Badge>
+                            </TableCell>
+                            <TableCell className="py-2">
+                              {lead.analysis?.subStatus ? (
+                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium border ${
+                                  lead.analysis.subStatus.toLowerCase() === "appointment set" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" :
+                                  "border-slate-500/30 bg-slate-500/10 text-slate-600 dark:text-slate-400"
+                                }`}>
+                                  {lead.analysis.subStatus}
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground text-[12px]">—</span>
+                              )}
                             </TableCell>
                             <TableCell className="py-2 text-right">
                                 <Button

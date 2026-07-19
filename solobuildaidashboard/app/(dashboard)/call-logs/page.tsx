@@ -114,6 +114,7 @@ export default function CallLogsPage() {
                 <TableHead className="text-xs">Duration</TableHead>
                 <TableHead className="text-xs">Date</TableHead>
                 <TableHead className="text-xs">Status</TableHead>
+                <TableHead className="text-xs">Sub Status</TableHead>
                 <TableHead className="text-xs w-[100px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -150,6 +151,18 @@ export default function CallLogsPage() {
                         <span className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${getCallStatusDot(call.status)}`} />
                         {call.status}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {call.analysis?.subStatus ? (
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium border ${
+                          call.analysis.subStatus.toLowerCase() === "appointment set" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" :
+                          "border-slate-500/30 bg-slate-500/10 text-slate-600 dark:text-slate-400"
+                        }`}>
+                          {call.analysis.subStatus}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground text-[12px]">—</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Button

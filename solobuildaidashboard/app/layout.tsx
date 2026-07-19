@@ -1,9 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { Sidebar } from "@/components/layout/sidebar";
-import { Navbar } from "@/components/layout/navbar";
-import { CampaignProvider } from "@/lib/campaign-store";
 import { AuthWrapper } from "@/components/layout/auth-wrapper";
 import { Toaster } from "react-hot-toast";
 
@@ -47,15 +44,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.className} antialiased`}>
         <AuthWrapper>
-          <CampaignProvider>
-            <div className="flex min-h-screen">
-              <Sidebar />
-              <div className="flex-1 pl-64">
-                <Navbar />
-                <main className="p-8 page-enter">{children}</main>
-              </div>
-            </div>
-          </CampaignProvider>
+          {children}
         </AuthWrapper>
         <Toaster position="top-right" />
       </body>

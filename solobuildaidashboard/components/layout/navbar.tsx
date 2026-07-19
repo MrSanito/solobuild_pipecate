@@ -31,11 +31,26 @@ export function Navbar() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [profileDefaultTab, setProfileDefaultTab] = useState<"general" | "vobiz" | "gemini">("general");
 
-  const [userName, setUserName] = useState("");
+  const [userName, setUserName] = useState("User");
   const [userEmail, setUserEmail] = useState("");
   const [userInitials, setUserInitials] = useState("U");
 
   useEffect(() => {
+    // 1. First, quickly set user data from sessionStorage to prevent "Loading..." flicker
+    const userStr = sessionStorage.getItem("solobuild_user");
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        setUserName(user.name || "User");
+        setUserEmail(user.email || "");
+        if (user.name) {
+          const initials = user.name.split(" ").map((n: string) => n[0]).join("").substring(0, 2).toUpperCase();
+          setUserInitials(initials || "U");
+        }
+      } catch (e) {}
+    }
+
+    // 2. Background fetch to get fresh data just in case it updated
     async function fetchUser() {
       try {
         const response = await fetchWithAuth("/api/settings");
@@ -58,7 +73,11 @@ export function Navbar() {
         console.error("Failed to fetch user for navbar", error);
       }
     }
-    fetchUser();
+    
+    // Only fetch if we have a token to prevent unnecessary 401s
+    if (sessionStorage.getItem("solobuild_token")) {
+      fetchUser();
+    }
   }, []);
 
   return (
@@ -103,7 +122,7 @@ export function Navbar() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
             <DropdownMenuLabel className="font-normal">
-              <p className="text-sm font-medium">{userName || "Loading..."}</p>
+              <p className="text-sm font-medium">{userName}</p>
               <p className="text-xs text-slate-500">{userEmail}</p>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
