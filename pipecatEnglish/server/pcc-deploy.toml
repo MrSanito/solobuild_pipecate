@@ -1,5 +1,5 @@
-agent_name = "rentopusEnglish"
-secret_set = "rentopusEnglish-secrets"
+agent_name = "rentopus-english"
+secret_set = "rentopus-english-secrets"
 agent_profile = "agent-1x"
 
 [scaling]

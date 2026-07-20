@@ -3,6 +3,8 @@ import { GET as getCampaigns } from "@/app/api/campaigns/route";
 import { GET as getAgents } from "@/app/api/agents/route";
 import { GET as getCalls } from "@/app/api/call/route";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: Request) {
   try {
     // We pass the same request to the imported handlers.

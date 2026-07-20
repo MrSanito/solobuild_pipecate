@@ -42,6 +42,14 @@ export function AuthWrapper({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  useEffect(() => {
+    if (isAuthenticated === false && !isAuthPage) {
+      router.push("/login");
+    } else if (isAuthenticated === true && isAuthPage) {
+      router.push("/");
+    }
+  }, [isAuthenticated, isAuthPage, router]);
+
   if (isAuthenticated === null) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center text-neutral-400 font-sans text-sm">
@@ -51,8 +59,6 @@ export function AuthWrapper({ children }: { children: React.ReactNode }) {
   }
 
   if (!isAuthenticated && !isAuthPage) {
-    // If not authenticated and not on an auth page, redirect to login
-    router.push("/login");
     // Show a loading state while redirecting
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center text-neutral-400 font-sans text-sm">
@@ -63,7 +69,6 @@ export function AuthWrapper({ children }: { children: React.ReactNode }) {
 
   // If we are on an auth page but authenticated, redirect to dashboard
   if (isAuthenticated && isAuthPage) {
-    router.push("/");
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center text-neutral-400 font-sans text-sm">
         Redirecting to dashboard...

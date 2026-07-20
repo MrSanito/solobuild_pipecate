@@ -66,11 +66,7 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Load from database on mount
   useEffect(() => {
-    if (initialized.current) return;
-    initialized.current = true;
-
     let isMounted = true;
 
     const loadInitialData = async () => {

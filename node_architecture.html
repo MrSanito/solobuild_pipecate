@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Node.js Internals — The Loop Beneath Your Code</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0d13; --panel:#11151e; --panel2:#151a25; --line:#242b3a; --text:#e7ebf3; --muted:#7c869c;
+    --v8:#f0db4f; --node:#6cc24a; --bind:#a78bfa; --libuv:#35c9c9; --queue:#ffd166;
+    --pool:#ff9d5c; --osio:#4fa8ff; --worker:#ff5c9d; --osop:#c8c8c8;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;}
+  .app{max-width:1500px;margin:0 auto;padding:22px 22px 60px;}
+  header{margin-bottom:24px;}
+  .eyebrow{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--libuv);margin-bottom:8px;}
+  h1{font-family:'JetBrains Mono',monospace;font-size:clamp(20px,2.6vw,30px);font-weight:800;margin:0 0 8px;letter-spacing:-.01em;}
+  h1 span{color:var(--v8);}
+  .sub{color:var(--muted);font-size:15px;max-width:820px;line-height:1.6;}
+
+  .stage{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:24px;overflow-x:auto;margin-bottom:24px;}
+  svg{width:100%;height:auto;display:block;min-width:900px;}
+
+  .box rect{fill:var(--panel2);stroke:var(--line);stroke-width:1.5;transition:stroke .2s,filter .2s;}
+  .box:hover rect{stroke-width:2.5;filter:drop-shadow(0 0 10px var(--v8));}
+  .box .label{font-family:'JetBrains Mono',monospace;font-weight:700;fill:var(--text);}
+  .box .sub{font-family:'Inter',sans-serif;fill:var(--muted);}
+  .box:hover .label{fill:#fff;}
+  .container-box{fill:none;stroke:var(--line);stroke-width:1.5;}
+  .zone-label{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.06em;text-transform:uppercase;font-weight:700;}
+  .zone-sub{font-family:'JetBrains Mono',monospace;font-size:9.5px;fill:var(--muted);letter-spacing:.04em;}
+  .conn{stroke:var(--line);stroke-width:1.5;fill:none;marker-end:url(#arrow);}
+  .conn.dashed{stroke-dasharray:5 5;}
+  .flow-label{font-family:'JetBrains Mono',monospace;font-size:10px;fill:var(--muted);letter-spacing:.04em;}
+
+  .qitem{fill:#1a2030;stroke:var(--queue);stroke-opacity:.4;stroke-width:1.2;stroke-dasharray:3 3;}
+  .hexline{fill:none;stroke:var(--libuv);stroke-width:1.2;stroke-dasharray:3 4;opacity:.5;}
+  .phase-pt circle{fill:var(--panel2);stroke:var(--line);stroke-width:1.5;}
+  .phase-pt text{font-family:'JetBrains Mono',monospace;font-size:10px;fill:var(--muted);}
+  .spin{transform-origin:860px 305px;animation:spin 16s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  @media(prefers-reduced-motion:reduce){.spin{animation:none;}}
+
+  .worker-boundary{stroke:var(--worker);stroke-dasharray:6 5;fill:rgba(255,92,157,.03);stroke-width:1.5;}
+  .libuv-boundary{stroke:var(--libuv);stroke-width:1.5;fill:rgba(53,201,201,.025);}
+
+  .legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;}
+  .legend-item{display:flex;gap:12px;align-items:flex-start;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 16px;}
+  .legend-swatch{width:12px;height:12px;border-radius:4px;margin-top:4px;flex-shrink:0;}
+  .legend-item .t{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;}
+  .legend-item .d{font-size:12.5px;color:var(--muted);line-height:1.5;margin-top:4px;}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="eyebrow">// how node.js actually runs your code</div>
+    <h1>Application → V8 → Bindings → <span>libuv</span> owns the Event Loop</h1>
+    <p class="sub">Horizontal flow, left to right — just like real Node.js system diagrams. libuv is the single C library that encapsulates the Event Queue, Event Loop, Thread Pool, and OS Async I/O.</p>
+  </header>
+
+  <div class="stage">
+    <svg id="diagram" viewBox="0 0 1560 650" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="context-stroke" fill-opacity=".8"/>
+        </marker>
+      </defs>
+
+      <!-- ===== CONTAINER OUTLINES ===== -->
+      <rect class="libuv-boundary" x="510" y="20" width="650" height="595" rx="16"/>
+      <text x="530" y="46" class="zone-label" fill="var(--libuv)">LIBUV</text>
+      <text x="530" y="60" class="zone-sub">(owns the event loop — async I/O)</text>
+
+      <rect class="worker-boundary" x="1200" y="20" width="340" height="595" rx="16"/>
+      <text x="1220" y="46" class="zone-label" fill="var(--worker)">WORKER THREADS</text>
+      <text x="1220" y="60" class="zone-sub">(worker_threads module — separate OS thread)</text>
+
+      <!-- ===== CONNECTORS ===== -->
+      <g id="connectors">
+        <path class="conn" d="M125,110 L125,172"/>
+        <path class="conn" d="M230,75 L268,75"/>
+        <path class="conn" d="M370,110 L370,172"/>
+        <path class="conn" d="M370,268 L370,278"/>
+        <path class="conn dashed" d="M370,315 C 250,350 200,380 128,352" stroke="#c8c8c8"/>
+        <path class="conn" d="M470,220 L508,220"/>
+        <path class="conn dashed" d="M1163,90 C 1185,90 1185,90 1198,90" stroke="#ff5c9d"/>
+        <path class="conn dashed" d="M1198,470 C 1185,470 1163,300 1163,300" stroke="#ff5c9d"/>
+        <path class="conn dashed" d="M1200,90 C 1180,90 300,610 235,220" stroke="#ff5c9d" opacity=".55"/>
+        <text x="700" y="212" text-anchor="middle" class="flow-label" fill="#ff9d5c">BLOCKING OPERATION →</text>
+        <text x="700" y="410" text-anchor="middle" class="flow-label" fill="#ff9d5c">← EXECUTE CALLBACK</text>
+      </g>
+
+      <!-- ===== COLUMN A: APPLICATION + V8 ===== -->
+      <g class="box" id="box-jscode" data-glow="var(--v8)">
+        <rect x="20" y="40" width="210" height="70" rx="10"/>
+        <text x="125" y="70" text-anchor="middle" class="label" font-size="13">APPLICATION</text>
+        <text x="125" y="88" text-anchor="middle" class="sub" font-size="10">your JavaScript code</text>
+      </g>
+      <text x="140" y="145" text-anchor="middle" class="zone-sub" fill="#f0db4f">JAVASCRIPT ↕</text>
+
+      <rect class="container-box" x="20" y="172" width="210" height="308" rx="12" stroke="#3a3320"/>
+      <text x="35" y="190" class="zone-label" font-size="10.5" fill="var(--v8)">V8 ENGINE</text>
+      <g class="box" id="box-stack" data-glow="var(--v8)">
+        <rect x="35" y="202" width="180" height="72" rx="8"/>
+        <text x="125" y="232" text-anchor="middle" class="label" font-size="12">Call Stack</text>
+        <text x="125" y="248" text-anchor="middle" class="sub" font-size="9.5">sync execution</text>
+      </g>
+      <g class="box" id="box-heap" data-glow="var(--v8)">
+        <rect x="35" y="282" width="180" height="72" rx="8"/>
+        <text x="125" y="312" text-anchor="middle" class="label" font-size="12">Heap</text>
+        <text x="125" y="328" text-anchor="middle" class="sub" font-size="9.5">object memory</text>
+      </g>
+      <g class="box" id="box-microtask" data-glow="var(--v8)">
+        <rect x="35" y="362" width="180" height="72" rx="8"/>
+        <text x="125" y="392" text-anchor="middle" class="label" font-size="12">Microtask Queue</text>
+        <text x="125" y="408" text-anchor="middle" class="sub" font-size="9">Promises, queueMicrotask</text>
+      </g>
+
+      <!-- ===== COLUMN B: NODE API + BINDINGS + OS OPERATION ===== -->
+      <g class="box" id="box-nodeapi" data-glow="var(--node)">
+        <rect x="270" y="40" width="200" height="70" rx="10"/>
+        <text x="370" y="66" text-anchor="middle" class="label" font-size="12">NODE.JS APIs</text>
+        <text x="370" y="82" text-anchor="middle" class="sub" font-size="9.5">fs · http · timers · crypto</text>
+        <text x="370" y="96" text-anchor="middle" class="sub" font-size="9.5">(Node API — JS land)</text>
+      </g>
+      <g class="box" id="box-bindings" data-glow="var(--bind)">
+        <rect x="270" y="172" width="200" height="90" rx="10"/>
+        <text x="370" y="205" text-anchor="middle" class="label" font-size="12">NODE.JS BINDINGS</text>
+        <text x="370" y="222" text-anchor="middle" class="sub" font-size="9.5">C++ glue → libuv C API</text>
+        <text x="370" y="240" text-anchor="middle" class="sub" font-size="9.5">this is where async is decided</text>
+      </g>
+      <g class="box" id="box-osop" data-glow="var(--osop)">
+        <rect x="270" y="278" width="200" height="72" rx="10" stroke-dasharray="5 4"/>
+        <text x="370" y="298" text-anchor="middle" class="label" font-size="11">SYNC LIBUV CALL</text>
+        <text x="370" y="312" text-anchor="middle" class="sub" font-size="8.5">same fn, no callback — runs inline</text>
+        <text x="370" y="325" text-anchor="middle" class="sub" font-size="8.5" fill="#ff8a8a">no thread pool, no event loop</text>
+        <text x="370" y="338" text-anchor="middle" class="sub" font-size="8.5" fill="#ff8a8a">— BLOCKS the calling thread</text>
+      </g>
+
+      <!-- ===== COLUMN C: LIBUV internals ===== -->
+      <g id="eventqueue">
+        <text x="580" y="90" text-anchor="middle" class="zone-sub" fill="var(--queue)">EVENT QUEUE</text>
+        <rect class="qitem" x="535" y="105" width="90" height="26" rx="4"/>
+        <rect class="qitem" x="535" y="137" width="90" height="26" rx="4"/>
+        <rect class="qitem" x="535" y="169" width="90" height="26" rx="4"/>
+        <g class="box" id="box-evqueue" data-glow="var(--queue)">
+          <rect x="535" y="201" width="90" height="30" rx="4"/>
+        </g>
+        <rect class="qitem" x="535" y="237" width="90" height="26" rx="4"/>
+        <rect class="qitem" x="535" y="269" width="90" height="26" rx="4"/>
+        <rect class="qitem" x="535" y="301" width="90" height="26" rx="4"/>
+      </g>
+
+      <g id="eventloop">
+        <text x="860" y="90" text-anchor="middle" class="zone-label" font-size="12" fill="var(--libuv)">EVENT LOOP</text>
+        <g class="spin"><polygon class="hexline" points="860,205 946.6,255 946.6,355 860,405 773.4,355 773.4,255"/></g>
+        <g class="phase-pt" id="pt-timers"><circle cx="860" cy="205" r="17"/><text x="860" y="209" text-anchor="middle">Timers</text></g>
+        <g class="phase-pt" id="pt-pending"><circle cx="946.6" cy="255" r="17"/><text x="946.6" y="259" text-anchor="middle" font-size="8">Pending</text></g>
+        <g class="phase-pt" id="pt-idle"><circle cx="946.6" cy="355" r="17"/><text x="946.6" y="359" text-anchor="middle" font-size="8">Idle</text></g>
+        <g class="phase-pt" id="pt-poll"><circle cx="860" cy="405" r="17"/><text x="860" y="409" text-anchor="middle">Poll</text></g>
+        <g class="phase-pt" id="pt-check"><circle cx="773.4" cy="355" r="17"/><text x="773.4" y="359" text-anchor="middle" font-size="8">Check</text></g>
+        <g class="phase-pt" id="pt-close"><circle cx="773.4" cy="255" r="17"/><text x="773.4" y="259" text-anchor="middle" font-size="8">Close</text></g>
+      </g>
+
+      <g class="box" id="box-threadpool" data-glow="var(--pool)">
+        <rect x="1000" y="90" width="140" height="200" rx="10"/>
+        <text x="1070" y="112" text-anchor="middle" class="label" font-size="11">Thread Pool</text>
+        <text x="1070" y="126" text-anchor="middle" class="sub" font-size="9">default 4 threads</text>
+        <rect x="1015" y="140" width="50" height="22" rx="5" fill="#1c2230" stroke="#3a2f22"/>
+        <rect x="1075" y="140" width="50" height="22" rx="5" fill="#1c2230" stroke="#3a2f22"/>
+        <rect x="1015" y="168" width="50" height="22" rx="5" fill="#1c2230" stroke="#3a2f22"/>
+        <rect x="1075" y="168" width="50" height="22" rx="5" fill="#1c2230" stroke="#3a2f22"/>
+        <text x="1070" y="220" text-anchor="middle" class="sub" font-size="8.5">File System</text>
+        <text x="1070" y="234" text-anchor="middle" class="sub" font-size="8.5">DNS · Crypto</text>
+        <text x="1070" y="248" text-anchor="middle" class="sub" font-size="8.5">Zlib</text>
+        <text x="1070" y="270" text-anchor="middle" class="sub" font-size="8" fill="#ff9d5c">blocking C calls</text>
+      </g>
+      <g class="box" id="box-osasync" data-glow="var(--osio)">
+        <rect x="1000" y="310" width="140" height="200" rx="10"/>
+        <text x="1070" y="332" text-anchor="middle" class="label" font-size="11">OS Async I/O</text>
+        <text x="1070" y="346" text-anchor="middle" class="sub" font-size="9">epoll·kqueue·IOCP</text>
+        <text x="1070" y="440" text-anchor="middle" class="sub" font-size="8.5">Network sockets</text>
+        <text x="1070" y="470" text-anchor="middle" class="sub" font-size="8" fill="#4fa8ff">no thread used —</text>
+        <text x="1070" y="483" text-anchor="middle" class="sub" font-size="8" fill="#4fa8ff">OS notifies directly</text>
+      </g>
+
+      <!-- ===== COLUMN D: worker_threads module ===== -->
+      <g class="box" id="box-workerspawn" data-glow="var(--worker)">
+        <rect x="1222" y="80" width="298" height="60" rx="10"/>
+        <text x="1371" y="106" text-anchor="middle" class="label" font-size="12">new Worker(file)</text>
+        <text x="1371" y="123" text-anchor="middle" class="sub" font-size="9.5">spawns a real OS thread</text>
+      </g>
+      <g class="box" id="box-workerisolate" data-glow="var(--worker)">
+        <rect x="1222" y="170" width="298" height="60" rx="10"/>
+        <text x="1371" y="196" text-anchor="middle" class="label" font-size="12">V8 Isolate #2</text>
+        <text x="1371" y="213" text-anchor="middle" class="sub" font-size="9.5">own memory, own heap</text>
+      </g>
+      <g class="box" id="box-workerlibuv" data-glow="var(--worker)">
+        <rect x="1222" y="260" width="298" height="60" rx="10"/>
+        <text x="1371" y="286" text-anchor="middle" class="label" font-size="12">Own libuv Event Loop</text>
+        <text x="1371" y="303" text-anchor="middle" class="sub" font-size="9.5">a full mini Node runtime</text>
+      </g>
+      <g class="box" id="box-workerrun" data-glow="var(--worker)">
+        <rect x="1222" y="350" width="298" height="100" rx="10"/>
+        <text x="1371" y="382" text-anchor="middle" class="label" font-size="12">Heavy JS Computation</text>
+        <text x="1371" y="400" text-anchor="middle" class="sub" font-size="9.5">runs truly in parallel —</text>
+        <text x="1371" y="415" text-anchor="middle" class="sub" font-size="9.5">main event loop never blocks</text>
+      </g>
+      <text x="1371" y="490" text-anchor="middle" class="zone-sub" fill="var(--worker)">postMessage ⇄ MessageChannel</text>
+
+    </svg>
+  </div>
+
+  <div class="legend" id="legend">
+    <div class="legend-item">
+      <div class="legend-swatch" style="background:#f0db4f"></div>
+      <div>
+        <div class="t" style="color:#f0db4f">V8 Engine</div>
+        <div class="d">Call stack, heap, microtask queue — where your JS actually runs.</div>
+      </div>
+    </div>
+    
+    <div class="legend-item">
+      <div class="legend-swatch" style="background:#6cc24a"></div>
+      <div>
+        <div class="t" style="color:#6cc24a">Node.js APIs</div>
+        <div class="d">JS-land wrappers: fs, http, timers, crypto...</div>
+      </div>
+    </div>
+    
+    <div class="legend-item">
+      <div class="legend-swatch" style="background:#a78bfa"></div>
+      <div>
+        <div class="t" style="color:#a78bfa">Bindings</div>
+        <div class="d">C++ glue — decides if a call goes sync or async.</div>
+      </div>
+    </div>
+    
+    <div class="legend-item">
+      <div class="legend-swatch" style="background:#c8c8c8"></div>
+      <div>
+        <div class="t" style="color:#c8c8c8">Sync libuv Call</div>
+        <div class="d">Same libuv function as the async version, run inline on the calling thread — skips the thread pool & event loop, not libuv itself.</div>
+      </div>
+    </div>
+    
+    <div class="legend-item">
+      <div class="legend-swatch" style="background:#ffd166"></div>
+      <div>
+        <div class="t" style="color:#ffd166">Event Queue</div>
+        <div class="d">Callbacks waiting for their turn on the Call Stack.</div>
+      </div>
+    </div>
+    
+    <div class="legend-item">
+      <div class="legend-swatch" style="background:#35c9c9"></div>
+      <div>
+        <div class="t" style="color:#35c9c9">Event Loop</div>
+        <div class="d">The engine libuv runs — cycles through 6 phases forever.</div>
+      </div>
+    </div>
+    
+    <div class="legend-item">
+      <div class="legend-swatch" style="background:#ff9d5c"></div>
+      <div>
+        <div class="t" style="color:#ff9d5c">Thread Pool</div>
+        <div class="d">4 default threads for blocking work: fs, crypto, zlib, dns.</div>
+      </div>
+    </div>
+    
+    <div class="legend-item">
+      <div class="legend-swatch" style="background:#4fa8ff"></div>
+      <div>
+        <div class="t" style="color:#4fa8ff">OS Async I/O</div>
+        <div class="d">epoll/kqueue/IOCP — sockets, zero extra threads.</div>
+      </div>
+    </div>
+    
+    <div class="legend-item">
+      <div class="legend-swatch" style="background:#ff5c9d"></div>
+      <div>
+        <div class="t" style="color:#ff5c9d">Worker Threads</div>
+        <div class="d">Separate isolate + own event loop, for parallel JS — not the same as the Thread Pool.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
