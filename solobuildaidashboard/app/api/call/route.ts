@@ -37,9 +37,11 @@ export async function GET(req: Request) {
       const formattedDate = call.createdAt ? new Date(call.createdAt).toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
+        timeZone: "Asia/Kolkata",
       }) + ", " + new Date(call.createdAt).toLocaleTimeString("en-US", {
         hour: "2-digit",
         minute: "2-digit",
+        timeZone: "Asia/Kolkata",
       }) : "--";
 
       return {

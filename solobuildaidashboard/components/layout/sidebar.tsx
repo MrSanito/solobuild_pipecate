@@ -35,6 +35,8 @@ export function Sidebar() {
   const { refreshCallLogs } = useCampaigns();
   const [isDialerOpen, setIsDialerOpen] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [contactName, setContactName] = useState("");
+  const [customerNumber, setCustomerNumber] = useState("");
   const [callingState, setCallingState] = useState<"idle" | "calling" | "success" | "error">("idle");
   const [statusMessage, setStatusMessage] = useState("");
 
@@ -48,6 +50,8 @@ export function Sidebar() {
 
   const handleClear = () => {
     setPhoneNumber("");
+    setContactName("");
+    setCustomerNumber("");
     setCallingState("idle");
   };
 
@@ -64,6 +68,8 @@ export function Sidebar() {
         },
         body: JSON.stringify({
           phoneNumber: phoneNumber,
+          name: contactName,
+          customerNumber: customerNumber
         }),
       });
 
@@ -189,8 +195,26 @@ export function Sidebar() {
             </DialogDescription>
           </DialogHeader>
 
+          {/* Contact Details */}
+          <div className="w-full flex flex-col gap-2 mb-2 mt-2 px-1">
+            <input
+              type="text"
+              value={contactName}
+              onChange={(e) => setContactName(e.target.value)}
+              placeholder="Name (optional)"
+              className="w-full bg-neutral-900 border border-border text-sm text-white rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
+            <input
+              type="text"
+              value={customerNumber}
+              onChange={(e) => setCustomerNumber(e.target.value)}
+              placeholder="Customer # (optional)"
+              className="w-full bg-neutral-900 border border-border text-sm text-white rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
+          </div>
+
           {/* Number Display */}
-          <div className="w-full bg-neutral-950/80 border border-border/80 rounded-xl p-3 mb-4 mt-2 flex items-center justify-between min-h-[50px]">
+          <div className="w-full bg-neutral-950/80 border border-border/80 rounded-xl p-3 mb-4 flex items-center justify-between min-h-[50px]">
             <input
               type="text"
               value={phoneNumber}

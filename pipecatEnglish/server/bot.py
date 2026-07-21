@@ -35,7 +35,14 @@ load_dotenv(override=True)
 from tools import rentopus_info_tool
 
 
-async def run_bot(transport: BaseTransport, handle_sigint: bool, gemini_api_key: str = None  ):
+async def run_bot(
+    transport: BaseTransport, 
+    handle_sigint: bool, 
+    gemini_api_key: str = None,
+    contact_name: str = None,
+    contact_number: str = None,
+    customer_number: str = None
+):
     logger.info("Initializing Yash (Rentopus Sales Voice Assistant)")
     llm = GeminiLiveLLMService(
         api_key=gemini_api_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"),
@@ -44,8 +51,13 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool, gemini_api_key:
             temperature=0.6,
             voice="Puck",
             language="en-US",
-            vad=GeminiVADParams(),
-            thinking={"thinking_budget": 256},
+            vad=GeminiVADParams(
+                start_sensitivity="START_SENSITIVITY_HIGH",
+                end_sensitivity="END_SENSITIVITY_HIGH",
+                prefix_padding_ms=0,
+                silence_duration_ms=300,
+            ),
+            thinking={"thinking_budget": 0},
         ),
         tools=[rentopus_info_tool],
         system_instruction=SYSTEM_INSTRUCTION
@@ -77,9 +89,17 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool, gemini_api_key:
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
         logger.info("Starting outbound call conversation for Yash")
+        if contact_name:
+            greeting_prompt = f"User just answered the phone. Please greet them exactly by saying: 'Hello {contact_name}... Yash this side from Rentopus.' Make sure to pause slightly after their name."
+        else:
+            greeting_prompt = "User just answered the phone. Please greet them exactly by saying: 'Hello... Yash this side from Rentopus.' Make sure to pause slightly after hello."
+            
+        if customer_number:
+            greeting_prompt += f" For your context, their customer number is {customer_number}."
+            
         context.add_message({
             "role": "user",
-            "content": "User just answered the phone. Please greet them by saying 'Hi, Yash this side from Rentopus'."
+            "content": greeting_prompt
         })
         await task.queue_frames([LLMRunFrame()])
 
@@ -95,7 +115,11 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool, gemini_api_key:
 
 async def bot(runner_args: RunnerArguments, call_id: str = None, stream_id: str = None, gemini_api_key: str = None):
     """Main bot entry point compatible with Pipecat Cloud."""
-    # Extract gemini_api_key from query params if not explicitly passed
+    contact_name = None
+    contact_number = None
+    customer_number = None
+
+    # Extract gemini_api_key and contact details from query params if not explicitly passed
     if not gemini_api_key and hasattr(runner_args, "websocket") and runner_args.websocket:
         try:
             body_param = runner_args.websocket.query_params.get("body")
@@ -106,6 +130,10 @@ async def bot(runner_args: RunnerArguments, call_id: str = None, stream_id: str 
                 body_data = json.loads(decoded_json)
                 logger.info(f"body_data: {body_data}")
                 gemini_api_key = body_data.get("gemini_api_key")
+                contact_name = body_data.get("name")
+                contact_number = body_data.get("mobile_number")
+                customer_number = body_data.get("customer_number")
+                logger.info(f"Extracted contact info: Name={contact_name}, Number={contact_number}, Customer#={customer_number}")
                 logger.info(f"Extracted gemini_api_key from WebSocket query parameters: ...{gemini_api_key[-4:] if gemini_api_key else 'None'}")
         except Exception as e:
             logger.warning(f"Could not extract gemini_api_key from websocket query params: {e}")
@@ -168,4 +196,12 @@ async def bot(runner_args: RunnerArguments, call_id: str = None, stream_id: str 
             )
         )
 
-    await run_bot(transport, handle_sigint, gemini_api_key=gemini_api_key)
+    await run_bot(
+        transport, 
+        handle_sigint, 
+        gemini_api_key=gemini_api_key,
+        contact_name=contact_name,
+        contact_number=contact_number,
+        customer_number=customer_number
+    )
+ 

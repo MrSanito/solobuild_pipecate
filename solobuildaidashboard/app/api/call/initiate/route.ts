@@ -5,7 +5,7 @@ import { verifyToken } from "@/lib/auth";
 
 export async function POST(req: Request) {
   try {
-    const { phoneNumber, campaignId, contactId, agentId } = await req.json();
+    const { phoneNumber, campaignId, contactId, agentId, name, customerNumber } = await req.json();
 
     if (!phoneNumber) {
       return NextResponse.json({ error: "Missing 'phoneNumber' in the request body" }, { status: 400 });
@@ -61,6 +61,13 @@ export async function POST(req: Request) {
       } else {
         answerUrl += `?agentId=${agentId}`;
       }
+    }
+
+    if (name) {
+      answerUrl += (answerUrl.includes('?') ? '&' : '?') + `name=${encodeURIComponent(name)}`;
+    }
+    if (customerNumber) {
+      answerUrl += (answerUrl.includes('?') ? '&' : '?') + `customerNumber=${encodeURIComponent(customerNumber)}`;
     }
 
     console.log(`[INITIATE] Triggering outbound Vobiz call. Target: ${sanitizedPhone}, Answer URL: ${answerUrl}`);

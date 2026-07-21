@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
-import { Call, Client, Agent } from "@/lib/models";
+import { Call, Client, Agent, Campaign } from "@/lib/models";
 
 export async function GET(req: Request) {
   return handleAnswer(req);
@@ -20,6 +20,8 @@ async function handleAnswer(req: Request) {
     const agentId = searchParams.get("agentId");
     const queryAgentName = searchParams.get("agentName");
     const queryOrgName = searchParams.get("orgName");
+    const queryName = searchParams.get("name");
+    const queryCustomerNumber = searchParams.get("customerNumber");
 
     // Also parse form data / body if present
     const contentType = req.headers.get("content-type") || "";
@@ -44,6 +46,10 @@ async function handleAnswer(req: Request) {
     await dbConnect();
 
     let clientGeminiApiKey = "";
+
+    let contactName = queryName || "";
+    let contactNumber = "";
+    let customerNumber = queryCustomerNumber || "";
 
     // Check if the call is marked for transfer
     if (CallUUID) {
@@ -73,6 +79,20 @@ async function handleAnswer(req: Request) {
           clientGeminiApiKey = client.geminiApiKey;
           console.log(`[ANSWER] Found client Gemini API key for Client: ${client._id}`);
         }
+
+        // Fetch contact details if available
+        contactNumber = callEntry.toNumber;
+        if (callEntry.campaignId && callEntry.contactId) {
+          const campaign = await Campaign.findById(callEntry.campaignId);
+          if (campaign) {
+            const contact = campaign.contacts.id(callEntry.contactId);
+            if (contact) {
+              contactName = contact.name;
+              contactNumber = contact.number;
+              customerNumber = contact.detail || "";
+            }
+          }
+        }
       }
     }
 
@@ -99,6 +119,10 @@ async function handleAnswer(req: Request) {
     if (clientGeminiApiKey) {
       bodyObj.gemini_api_key = clientGeminiApiKey;
     }
+
+    if (contactNumber) bodyObj.mobile_number = contactNumber;
+    if (contactName) bodyObj.name = contactName;
+    if (customerNumber) bodyObj.customer_number = customerNumber;
 
     const bodyEncoded = Buffer.from(JSON.stringify(bodyObj)).toString("base64");
 
