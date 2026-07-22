@@ -29,7 +29,7 @@ from instructions import SYSTEM_PROMPT
 
 # ── YASH / RENTOPUS KNOWLEDGE BASE & FUNCTION CALL ──
 
-from tools import rentopus_info_tool
+from tools import cyberarcmsp_info_tool
 
 
 async def run_bot(
@@ -40,23 +40,23 @@ async def run_bot(
     contact_number: str = None,
     customer_number: str = None
 ):
-    logger.info("Initializing Yash (Rentopus Sales Voice Assistant)")
+    logger.info("Initializing Rohan (CyberArcMSP Sales Voice Assistant)")
     llm = GeminiLiveLLMService(
         api_key=gemini_api_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"),
         settings=GeminiLiveLLMService.Settings(
             model="gemini-3.1-flash-live-preview",
             temperature=0.6,
-            voice="Puck",
+            voice="Dipper",
             language="hi-IN",
             vad=GeminiVADParams(
                 start_sensitivity="START_SENSITIVITY_HIGH",
-                end_sensitivity="END_SENSITIVITY_HIGH",
+                end_sensitivity="END_SENSITIVITY_LOW",
                 prefix_padding_ms=0,
-                silence_duration_ms=300,
+                silence_duration_ms=500,
             ),
             thinking={"thinking_budget": 0},
         ),
-        tools=[rentopus_info_tool],
+        tools=[cyberarcmsp_info_tool],
         system_instruction=SYSTEM_PROMPT
     )
 
@@ -85,11 +85,11 @@ async def run_bot(
 
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
-        logger.info("Starting outbound call conversation for Yash")
+        logger.info("Starting outbound call conversation for Rohan")
         if contact_name:
-            greeting_prompt = f"User just answered the phone. Please greet them exactly by saying: 'नमस्ते {contact_name}... मैं Rentopus से यश बात कर रहा हूँ।' Make sure to pause slightly after their name."
+            greeting_prompt = f"User just answered the phone. Please greet them exactly by saying: 'Hello {contact_name}... Mera naam Rohan hai CyberArcMSP se. Kaise hain aap?' Make sure to pause slightly after their name."
         else:
-            greeting_prompt = "User just answered the phone. Please greet them exactly by saying: 'नमस्ते... मैं Rentopus से यश बात कर रहा हूँ।' Make sure to pause slightly after नमस्ते."
+            greeting_prompt = "User just answered the phone. Please greet them exactly by saying: 'Hello... Mera naam Rohan hai CyberArcMSP se. Kaise hain aap?' Make sure to pause slightly after hello."
             
         if customer_number:
             greeting_prompt += f" For your context, their customer number is {customer_number}."
@@ -178,20 +178,15 @@ async def bot(runner_args: RunnerArguments, call_id: str = None, stream_id: str 
             ),
         )
     else:
-        # Fall back to Daily WebRTC Room transport (for --use-daily CLI testing)
-        from pipecat.transports.daily.transport import DailyTransport, DailyParams
+        # Fall back to standard WebRTC (for local dashboard testing)
+        from pipecat.runner.utils import create_transport
+        from pipecat.transports.base_transport import TransportParams
         
-        logger.info("Initializing bot in Daily WebRTC room mode for Yash")
-        transport = DailyTransport(
-            room_url=runner_args.room_url,
-            token=runner_args.token,
-            bot_name="Yash",
-            params=DailyParams(
-                audio_out_enabled=True,
-                audio_in_enabled=True,
-                camera_out_enabled=False,
-            )
-        )
+        logger.info("Initializing bot in standard WebRTC mode for local testing")
+        transport_params = {
+            "webrtc": lambda: TransportParams(audio_in_enabled=True, audio_out_enabled=True),
+        }
+        transport = await create_transport(runner_args, transport_params)
 
     await run_bot(
         transport, 
@@ -201,3 +196,9 @@ async def bot(runner_args: RunnerArguments, call_id: str = None, stream_id: str 
         contact_number=contact_number,
         customer_number=customer_number
     )
+
+
+    
+if __name__ == "__main__":
+    from pipecat.runner.run import main
+    main()

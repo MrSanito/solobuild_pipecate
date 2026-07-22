@@ -121,8 +121,13 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
             temperature=0.6,
             voice="Puck",  # requested voice
             language="en-US",  # English
-            vad=GeminiVADParams(),
-            thinking={"thinking_budget": 256},
+            vad=GeminiVADParams(
+                start_sensitivity="START_SENSITIVITY_HIGH",
+                end_sensitivity="END_SENSITIVITY_LOW",
+                prefix_padding_ms=0,
+                silence_duration_ms=300,
+            ),
+            thinking={"thinking_budget": 0},
         ),
         system_instruction=(
             "RENTOPUS AI SALES VOICE ASSISTANT — Yash | English | Human-Toned\n\n"
@@ -336,6 +341,10 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
 async def bot(runner_args: RunnerArguments):
     transport_params = {
         "webrtc": lambda: TransportParams(
+            audio_in_enabled=True,
+            audio_out_enabled=True,
+        ),
+        "local": lambda: TransportParams(
             audio_in_enabled=True,
             audio_out_enabled=True,
         ),

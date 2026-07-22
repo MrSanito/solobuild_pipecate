@@ -2,5 +2,9 @@ agent_name = "quickstart-agent"
 secret_set = "quickstart-agent-secrets"
 agent_profile = "agent-1x"
 
+
 [scaling]
 min_agents = 0
+
+[krisp_viva]
+audio_filter = "tel"

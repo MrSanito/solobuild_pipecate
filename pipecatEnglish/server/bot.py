@@ -53,9 +53,9 @@ async def run_bot(
             language="en-US",
             vad=GeminiVADParams(
                 start_sensitivity="START_SENSITIVITY_HIGH",
-                end_sensitivity="END_SENSITIVITY_HIGH",
+                end_sensitivity="END_SENSITIVITY_LOW",
                 prefix_padding_ms=0,
-                silence_duration_ms=300,
+                silence_duration_ms=500,
             ),
             thinking={"thinking_budget": 0},
         ),
@@ -181,20 +181,15 @@ async def bot(runner_args: RunnerArguments, call_id: str = None, stream_id: str 
             ),
         )
     else:
-        # Fall back to Daily WebRTC Room transport (for --use-daily CLI testing)
-        from pipecat.transports.daily.transport import DailyTransport, DailyParams
+        # Fall back to standard WebRTC (for local dashboard testing)
+        from pipecat.runner.utils import create_transport
+        from pipecat.transports.base_transport import TransportParams
         
-        logger.info("Initializing bot in Daily WebRTC room mode for Yash")
-        transport = DailyTransport(
-            room_url=runner_args.room_url,
-            token=runner_args.token,
-            bot_name="Yash",
-            params=DailyParams(
-                audio_out_enabled=True,
-                audio_in_enabled=True,
-                camera_out_enabled=False,
-            )
-        )
+        logger.info("Initializing bot in standard WebRTC mode for local testing")
+        transport_params = {
+            "webrtc": lambda: TransportParams(audio_in_enabled=True, audio_out_enabled=True),
+        }
+        transport = await create_transport(runner_args, transport_params)
 
     await run_bot(
         transport, 
