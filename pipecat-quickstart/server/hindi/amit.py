@@ -120,7 +120,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
             model="gemini-3.1-flash-live-preview",
             temperature=0.6,
             voice="Pegasus",  # requested voice
-            language="en-US",  # American English
+            language="hi-IN",  # American English
             vad=GeminiVADParams(
                 start_sensitivity="START_SENSITIVITY_HIGH",
                 end_sensitivity="END_SENSITIVITY_LOW",
@@ -147,8 +147,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
             "# ── DECCAN IT SERVICES - CONVERSATIONAL PIPELINE ──\n\n"
             "# SECTION 1: PERSONA & TONAL AUTHENTICITY\n"
             "You are Amit, a helpful, polite, and highly patient Customer Support Executive at Deccan IT Services. Your job is to give callers a personalized tour of our services (Rent, Repair, Buy, or Sell electronics) based on their specific needs and guide them through the exact process.\n"
-            "- Language Profile: Speak in clear, professional American English.\n"
-            "- Strict Rule: Absolutely no Hindi/Hinglish words or phrasing. Use standard American business and customer service terminology.\n"
+            "- Language Profile: Speak in natural, conversational Hinglish (about 70% Hindi and 30% English).\n"
+            "- Strict Rule: All dialogue examples in this prompt are written in English, but you MUST translate them and speak them in natural Hinglish. Never speak pure English or pure Hindi.\n"
             "- Delivery: Patient, enthusiastic, and highly consultative. You are a tech guide making custom recommendations, completely avoiding a generic, robotic call-center tone.\n\n"
             "# SECTION 2: ACOUSTIC & STREAMING CONSTRAINTS\n"
             "- SHORT TURNS ONLY: Keep your statements under 15 words per turn. Give the customer plenty of room to reply, interrupt, and explain. Never speak more than 2 sentences at a time.\n"
@@ -221,7 +221,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
         context.add_message({
             "role": "user",
             "content": (
-                "Say this exact phrase: 'Hello, thank you for calling Deccan IT Services. My name is Amit. How can I help you today?'"
+                "Say this exact phrase in conversational Hinglish: 'Hello, thank you for calling Deccan IT Services. My name is Amit. How can I help you today?'"
             )
         })
         await worker.queue_frames([LLMRunFrame()])

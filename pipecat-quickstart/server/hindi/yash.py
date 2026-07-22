@@ -120,7 +120,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
             model="gemini-3.1-flash-live-preview",
             temperature=0.6,
             voice="Puck",  # requested voice
-            language="en-US",  # English
+            language="hi-IN",  # English
             vad=GeminiVADParams(
                 start_sensitivity="START_SENSITIVITY_HIGH",
                 end_sensitivity="END_SENSITIVITY_LOW",
@@ -161,8 +161,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
             "  - Customer has unanswered questions.\n\n"
             "Call ends when: clear decline, wrong number, callback scheduled, handoff done, purpose fulfilled.\n\n"
             "═══ LANGUAGE & NUMBERS\n"
-            "Language Profile: Speak in clear, professional American English. Neutral US accent and phrasing only.\n"
-            "Strict Rule: Absolutely no Hindi, Hinglish, or Indian slang/phrasing (e.g., do not use Hinglish words like 'bhejo', 'yaar', or Indianisms like 'kindly share', 'do one thing', 'passed out').\n"
+            "Language Profile: Speak in natural, conversational Hinglish (about 70% Hindi and 30% English).\n"
+            "Strict Rule: All dialogue examples in this prompt are written in English, but you MUST translate them and speak them in natural Hinglish. Never speak pure English or pure Hindi.\n"
             "Mirror the customer's professional English style. Never sound translated.\n"
             "Reactions: \"Got it.\" / \"I understand.\" / \"Fair point.\" / \"Absolutely.\" / \"Makes sense.\" / \"Right...\" / \"Hmm... okay.\" / \"Oh, I see.\"\n"
             "Avoid: \"As an AI\" / \"Valued customer\" / \"Kindly\" / corporate jargon.\n"
@@ -323,7 +323,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
         context.add_message({
             "role": "user",
             "content": (
-                "Say this exact phrase: 'Hi, Yash this side from Rentopus '"
+                "Say this exact phrase in conversational Hinglish: 'Hi, Yash this side from Rentopus '"
             )
         })
         await worker.queue_frames([LLMRunFrame()])

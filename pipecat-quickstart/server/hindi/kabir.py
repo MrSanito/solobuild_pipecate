@@ -120,7 +120,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
             model="gemini-3.1-flash-live-preview",
             temperature=0.6,
             voice="Dipper",  # requested voice
-            language="en-US",  # American English
+            language="hi-IN",  # American English
             vad=GeminiVADParams(
                 start_sensitivity="START_SENSITIVITY_HIGH",
                 end_sensitivity="END_SENSITIVITY_LOW",
@@ -152,8 +152,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
             "# ── SHOWTIME EVENTS - CONVERSATIONAL PIPELINE ──\n\n"
             "# SECTION 1: PERSONA & TONAL AUTHENTICITY\n"
             "You are Kabir, a sharp, corporate, and highly professional Event Consultant representing Showtime Events. Your job is to invite B2B business owners, machinery manufacturers, and logistics players to exhibit at our upcoming global expo, analyze their operational profile, and share the live layout booking link.\n"
-            "- Language Profile: Speak in clear, professional American English.\n"
-            "- Strict Rule: Absolutely no Hindi/Hinglish words or phrasing. Use everyday industrial business vocabulary (e.g., use \"stall\", \"booth\", \"logistics\", \"import export\", \"machinery\", \"international buyers\", \"footfall\", \"venue\", \"pricing\", \"booking link\", \"prime location\", \"three-phase power\", \"loading bay\", \"B2B\").\n"
+            "- Language Profile: Speak in natural, conversational Hinglish (about 70% Hindi and 30% English).\n"
+            "- Strict Rule: All dialogue examples in this prompt are written in English, but you MUST translate them and speak them in natural Hinglish. Never speak pure English or pure Hindi.\n"
             "- Delivery: Highly consultative, analytical, and an exceptional listener. Since enterprise clients will have sharp technical questions about BKC's infrastructure, power supply, weight limits, and international buyer profiles, let them ask fully without interrupting.\n\n"
             "# SECTION 2: ACOUSTIC & STREAMING CONSTRAINTS\n"
             "- SHORT TURNS ONLY: Keep your statements under 15 words per turn. Give the caller maximum room to talk about their business, ask operational questions, and list technical requirements. Never speak more than 2 sentences at a time.\n"
@@ -216,7 +216,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
         context.add_message({
             "role": "user",
             "content": (
-                "Say this exact phrase: 'Hello, this is Kabir from Showtime Events. I\'m calling about our upcoming Global Trade and Logistics Expo. Do you have a couple of minutes to chat?'"
+                "Say this exact phrase in conversational Hinglish: 'Hello, this is Kabir from Showtime Events. I\'m calling about our upcoming Global Trade and Logistics Expo. Do you have a couple of minutes to chat?'"
             )
         })
         await worker.queue_frames([LLMRunFrame()])

@@ -120,7 +120,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
             model="gemini-3.1-flash-live-preview",
             temperature=0.6,
             voice="Kore",  # requested voice
-            language="en-US",  # American English
+            language="hi-IN",  # American English
             vad=GeminiVADParams(
                 start_sensitivity="START_SENSITIVITY_HIGH",
                 end_sensitivity="END_SENSITIVITY_LOW",
@@ -157,8 +157,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
             "# ── TECHZILLA RECRUITMENT - CONVERSATIONAL PIPELINE ──\n\n"
             "# SECTION 1: PERSONA & TONAL AUTHENTICITY\n"
             "You are Sneha, a friendly, highly professional, and welcoming HR Recruiter at Techzilla. Your job is to conduct an initial screening interview with candidates for the Technical Engineer position, keeping them comfortable while strictly vetting their background.\n"
-            "- Language Profile: Speak in clear, professional American English.\n"
-            "- Strict Rule: Absolutely no Hindi/Hinglish words or phrasing. Use standard IT and corporate terms that developers use daily (e.g., use \"screening\", \"technical engineer\", \"experience\", \"notice period\", \"current salary\", \"expected salary\", \"web development\", \"app dev\", \"security software\").\n"
+            "- Language Profile: Speak in natural, conversational Hinglish (about 70% Hindi and 30% English).\n"
+            "- Strict Rule: All dialogue examples in this prompt are written in English, but you MUST translate them and speak them in natural Hinglish. Never speak pure English or pure Hindi.\n"
             "- Delivery: Encouraging, polite, and conversational. You are evaluating their communication skills, so give them space to speak, but firmly guide the conversation from beat to beat.\n\n"
             "# SECTION 2: ACOUSTIC & STREAMING CONSTRAINTS\n"
             "- MAX 15 WORDS PER TURN: Keep your questions and responses under 15 words. Never speak more than 1 or 2 short sentences at a time.\n"
@@ -222,7 +222,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
         context.add_message({
             "role": "user",
             "content": (
-                "Say this exact phrase: 'Hello, is this Sachin? This is Sneha calling from Techzilla.'"
+                "Say this exact phrase in conversational Hinglish: 'Hello, is this Sachin? This is Sneha calling from Techzilla.'"
             )
         })
         await worker.queue_frames([LLMRunFrame()])

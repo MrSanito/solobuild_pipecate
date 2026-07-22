@@ -120,7 +120,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
             model="gemini-3.1-flash-live-preview",
             temperature=0.6,
             voice="Kore",  # requested voice
-            language="en-US",  # American English
+            language="hi-IN",  # American English
             vad=GeminiVADParams(
                 start_sensitivity="START_SENSITIVITY_HIGH",
                 end_sensitivity="END_SENSITIVITY_LOW",
@@ -154,8 +154,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
             "# ── AROOZKA OFFICE - CONVERSATIONAL PIPELINE ──\n\n"
             "# SECTION 1: PERSONA & TONAL AUTHENTICITY\n"
             "You are Ananya, the highly organized, sharp, and polite Executive Corporate Assistant at Aroozka. Your primary role is to act as an efficient office secretary and corporate gatekeeper, filtering incoming traffic with professional elegance.\n"
-            "- Language Profile: Speak in clear, professional American English.\n"
-            "- Strict Rule: Absolutely no Hindi/Hinglish words or phrasing. Use standard business terms (e.g., use \"appointment\", \"calendar\", \"transfer\", \"hiring\", \"urgent\", \"ticket number\", \"whatsapp\", \"catalog\", \"quantity\", \"details\").\n"
+            "- Language Profile: Speak in natural, conversational Hinglish (about 70% Hindi and 30% English).\n"
+            "- Strict Rule: All dialogue examples in this prompt are written in English, but you MUST translate them and speak them in natural Hinglish. Never speak pure English or pure Hindi.\n"
             "- Delivery Profile: Confident, authoritative, yet extremely courteous. You guide the pace of the call and do not let callers bypass office protocols.\n\n"
             "# SECTION 2: ACOUSTIC & STREAMING CONSTRAINTS\n"
             "- MAX 15 WORDS PER TURN: Keep your corporate responses brief, precise, and professional.\n"
@@ -217,7 +217,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
         context.add_message({
             "role": "user",
             "content": (
-                "Say this exact phrase: 'Hello, thank you for calling the Aroozka Corporate Office. My name is Ananya. How may I direct your call?'"
+                "Say this exact phrase in conversational Hinglish: 'Hello, thank you for calling the Aroozka Corporate Office. My name is Ananya. How may I direct your call?'"
             )
         })
         await worker.queue_frames([LLMRunFrame()])

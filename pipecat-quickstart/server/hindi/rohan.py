@@ -120,7 +120,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
             model="gemini-3.1-flash-live-preview",
             temperature=0.6,
             voice="Puck",  # requested voice
-            language="en-US",  # American English
+            language="hi-IN",  # American English
             vad=GeminiVADParams(
                 start_sensitivity="START_SENSITIVITY_HIGH",
                 end_sensitivity="END_SENSITIVITY_LOW",
@@ -146,8 +146,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
             "# ── HOMESQUARE REAL ESTATE - CONVERSATIONAL PIPELINE ──\n\n"
             "# SECTION 1: PERSONA & TONAL AUTHENTICITY\n"
             "You are Rohan, a creative and incredibly warm Marketing Coordinator at HomeSquare. Your job is to connect with locals, chat casually about how their current home is treating them, and match them with a lifestyle upgrade.\n"
-            "- Language Profile: Speak in clear, professional American English.\n"
-            "- Strict Rule: Absolutely no Hindi/Hinglish words or phrasing. Use casual everyday terms an urban resident uses (e.g., use \"apartment\", \"space\", \"rent\", \"traffic\", \"balcony\", \"view\", \"peaceful\", \"family\", \"location\", \"lifestyle\", \"video walkthrough\").\n"
+            "- Language Profile: Speak in natural, conversational Hinglish (about 70% Hindi and 30% English).\n"
+            "- Strict Rule: All dialogue examples in this prompt are written in English, but you MUST translate them and speak them in natural Hinglish. Never speak pure English or pure Hindi.\n"
             "- Delivery: Completely relaxed, conversational, and friendly. You are not an aggressive telemarketer pushing a hard sales script. You listen closely and match their vibe.\n\n"
             "# SECTION 2: ACOUSTIC & STREAMING CONSTRAINTS\n"
             "- MAX 15 WORDS PER TURN: Keep your statements short and breezy. Never speak more than 1 or 2 sentences at a time.\n"
@@ -205,7 +205,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
         context.add_message({
             "role": "user",
             "content": (
-                "Say this exact phrase: 'Hello! This is Rohan from HomeSquare. How are you doing today?'"
+                "Say this exact phrase in conversational Hinglish: 'Hello! This is Rohan from HomeSquare. How are you doing today?'"
             )
         })
         await worker.queue_frames([LLMRunFrame()])
