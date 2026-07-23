@@ -114,8 +114,67 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
         handler=get_rentopus_info
     )
 
+    async def send_whatsapp_demo(params: FunctionCallParams) -> None:
+        logger.info(f"send_whatsapp_demo tool called with args: {params.arguments}")
+        await params.result_callback({"status": "success", "message": "Demo sent successfully"})
+
+    send_whatsapp_demo_tool = FunctionSchema(
+        name="send_whatsapp_demo",
+        description="Send a WhatsApp demo to the customer.",
+        properties={
+            "phone_number": {
+                "type": "string",
+                "description": "The phone number of the customer."
+            }
+        },
+        required=["phone_number"],
+        handler=send_whatsapp_demo
+    )
+
+    async def schedule_callback(params: FunctionCallParams) -> None:
+        logger.info(f"schedule_callback tool called with args: {params.arguments}")
+        await params.result_callback({"status": "success", "message": "Callback scheduled"})
+
+    schedule_callback_tool = FunctionSchema(
+        name="schedule_callback",
+        description="Schedule a callback with the customer.",
+        properties={
+            "time": {
+                "type": "string",
+                "description": "The specific time for the callback."
+            }
+        },
+        required=["time"],
+        handler=schedule_callback
+    )
+    
+    async def transfer_to_human(params: FunctionCallParams) -> None:
+        logger.info("transfer_to_human tool called")
+        await params.result_callback({"status": "success", "message": "Transferred to human"})
+        
+    transfer_to_human_tool = FunctionSchema(
+        name="transfer_to_human",
+        description="Transfer the call to a human agent.",
+        properties={},
+        required=[],
+        handler=transfer_to_human
+    )
+    
+    async def end_call(params: FunctionCallParams) -> None:
+        logger.info("end_call tool called")
+        await params.result_callback({"status": "success", "message": "Call ended"})
+        
+    end_call_tool = FunctionSchema(
+        name="end_call",
+        description="End the call.",
+        properties={},
+        required=[],
+        handler=end_call
+    )
+
     llm = GeminiLiveLLMService(
         api_key=os.getenv("GEMINI_API_KEY"),
+        tools=[rentopus_info_tool, send_whatsapp_demo_tool, schedule_callback_tool, transfer_to_human_tool, end_call_tool],
         settings=GeminiLiveLLMService.Settings(
             model="gemini-3.1-flash-live-preview",
             temperature=0.6,
@@ -127,7 +186,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
                 prefix_padding_ms=0,
                 silence_duration_ms=300,
             ),
-            thinking={"thinking_budget": 0},
+            thinking={"thinking_budget": 24},
         ),
         system_instruction=(
             "RENTOPUS AI SALES VOICE ASSISTANT — Yash | English | Human-Toned\n\n"
@@ -172,14 +231,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
             "  2 users → \"two users\"\n"
             "Use English numbers.\n\n"
             "═══ TOOL USAGE — NEVER ANSWER PRODUCT/PRICING FROM MEMORY\n"
-            "get_intro_framework      → Once, conversation start.\n"
-            "get_discovery_questions  → Discovery phase; pick ONE unanswered question.\n"
-            "search_pain_solution     → Customer describes any problem or friction.\n"
-            "search_product_info      → Pricing, platform, security, setup, clients.\n"
-            "search_knowledge_base    → FAQ, installation, billing, industries, anything else.\n"
-            "handle_objection         → Any resistance: \"too expensive\" / \"already have software\" / \"send on WhatsApp\" / \"busy\" / \"not interested\".\n"
-            "get_closing_action       → Enough context to recommend next step.\n"
-            "send_whatsapp_demo       → Customer asks for details or says \"details bhejo\".\n"
+            "get_rentopus_info        → Use this for getting intro framework, discovery questions, pain solutions, product info, pricing, platform, security, setup, clients, knowledge base, FAQs, installation, billing, industries, etc.\n"
+            "send_whatsapp_demo       → Customer asks for details or says \"details bhejo\". Always ask for the phone number before calling this.\n"
             "schedule_callback        → Customer is busy — get specific time first.\n"
             "transfer_to_human        → Customer explicitly asks to speak to a human or customer care.\n"
             "end_call                 → Done / wrong number / not interested / callback confirmed.\n\n"
@@ -247,9 +300,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
             "P4 — Callback (bad timing — always get specific time)\n"
             "  → schedule_callback → end_call. \"Would this evening work better, or tomorrow?\"\n\n"
             "═══ PRICING FLOW\n"
-            "First ask → search_product_info + send_whatsapp_demo → \"Fifteen thousand rupees annually — and we also have a thirty-day free trial.\" Continue call.\n"
+            "First ask → get_rentopus_info + send_whatsapp_demo → \"Fifteen thousand rupees annually — and we also have a thirty-day free trial.\" Continue call.\n"
             "Discuss value before price. Never lead with number alone.\n"
-            "Too expensive → handle_objection → \"That is why we have the free trial — test it first.\"\n"
+            "Too expensive → handle objection → \"That is why we have the free trial — test it first.\"\n"
             "Still pushes → schedule_callback. Never loop back to demo.\n\n"
             "═══ OBJECTION HANDLING\n"
             "Principle: objections are information. Do not fight them. Max two pushes then respect it. Never repeat same response.\n"
@@ -273,16 +326,16 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
             "═══ KNOWLEDGE BASE — INSTALLATION\n"
             "Web-based — no download. Any browser, any device, multiple users simultaneously. Basic internet sufficient. Ninety nine percent uptime.\n"
             "\"No downloads needed — just open it in a browser. It works on both mobile and laptop.\"\n"
-            "Never recite KB as a list. Always retrieve via search_knowledge_base before answering.\n\n"
+            "Never recite KB as a list. Always retrieve via get_rentopus_info before answering.\n\n"
             "═══ FEW-SHOT EXAMPLES\n"
-            "\"What does the software do?\"       → [search_product_info] \"Rentopus manages bookings, inventory, and daily operations in one place. How are you handling it currently?\"\n"
+            "\"What does the software do?\"       → [get_rentopus_info] \"Rentopus manages bookings, inventory, and daily operations in one place. How are you handling it currently?\"\n"
             "\"We manage on WhatsApp.\" → \"That is very common — as bookings grow, do you ever face any coordination issues?\"\n"
-            "\"We have inventory problems.\"        → [search_pain_solution] \"Where does the issue usually come from — availability or coordination?\"\n"
-            "\"Already using a software.\"         → [handle_objection] \"What made you decide to explore other alternatives?\"\n"
+            "\"We have inventory problems.\"        → [get_rentopus_info] \"Where does the issue usually come from — availability or coordination?\"\n"
+            "\"Already using a software.\"         → \"What made you decide to explore other alternatives?\"\n"
             "\"Send details.\"                → [send_whatsapp_demo] \"Absolutely — what is the name of your business?\"\n"
-            "\"How much does it cost?\"             → [search_product_info + send_whatsapp_demo] \"Fifteen thousand rupees annually — and we have a thirty-day free trial as well.\"\n"
-            "\"That is too expensive.\"              → [handle_objection] \"That is why we offer a free trial — try it out first.\"\n"
-            "\"Do I need to install it?\"         → [search_knowledge_base] \"No downloads needed — just open it in your browser.\"\n"
+            "\"How much does it cost?\"             → [get_rentopus_info + send_whatsapp_demo] \"Fifteen thousand rupees annually — and we have a thirty-day free trial as well.\"\n"
+            "\"That is too expensive.\"              → \"That is why we offer a free trial — try it out first.\"\n"
+            "\"Do I need to install it?\"         → [get_rentopus_info] \"No downloads needed — just open it in your browser.\"\n"
             "\"I am busy right now.\"                    → [schedule_callback] \"Would this evening or tomorrow be better?\"\n"
             "\"I want to speak to a person.\"     → [transfer_to_human] \"Sure, I can connect you with a team member.\"\n\n"
             "═══ NON-NEGOTIABLES\n"

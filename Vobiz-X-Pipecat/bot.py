@@ -5,7 +5,7 @@
 #
 
 import os
-
+import time
 from dotenv import load_dotenv
 from loguru import logger
 from pipecat.pipeline.pipeline import Pipeline
@@ -16,7 +16,8 @@ from pipecat.processors.aggregators.llm_response_universal import LLMContextAggr
 from pipecat.runner.types import RunnerArguments
 from pipecat.serializers.vobiz import VobizFrameSerializer, parse_vobiz_start
 from pipecat.services.google.gemini_live.llm import GeminiLiveLLMService, GeminiVADParams
-from pipecat.frames.frames import LLMRunFrame
+from pipecat.frames.frames import LLMRunFrame, AudioRawFrame
+from pipecat.processors.frame_processor import FrameProcessor, FrameDirection
 from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.websocket.fastapi import (
     FastAPIWebsocketParams,
@@ -25,6 +26,21 @@ from pipecat.transports.websocket.fastapi import (
 
 load_dotenv(override=True)
 
+class FirstAudioLogProcessor(FrameProcessor):
+    def __init__(self):
+        super().__init__()
+        self.logged = False
+
+    async def process_frame(self, frame, direction):
+        await super().process_frame(frame, direction)
+        
+        # We only care about bot's audio going out
+        if not self.logged and type(frame).__name__ in ("AudioRawFrame", "TTSAudioRawFrame", "OutputAudioRawFrame") and direction == FrameDirection.DOWNSTREAM:
+            t_D = time.perf_counter()
+            print(f"[TIMESTAMP D] First audio / playAudio bytes leave: {t_D}")
+            self.logged = True
+            
+        await self.push_frame(frame, direction)
 
 async def run_bot(transport: BaseTransport, handle_sigint: bool, gemini_api_key: str = None):
     llm = GeminiLiveLLMService(
@@ -97,12 +113,14 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool, gemini_api_key:
 
     context = LLMContext()
     context_aggregator = LLMContextAggregatorPair(context, realtime_service_mode=True)
+    first_audio_logger = FirstAudioLogProcessor()
 
     pipeline = Pipeline(
         [
             transport.input(),  # Websocket input from client
             context_aggregator.user(),
             llm,  # Gemini Multimodal Live API LLM
+            first_audio_logger,
             transport.output(),  # Websocket output to client
             context_aggregator.assistant(),
         ]
@@ -141,6 +159,9 @@ async def run_bot(transport: BaseTransport, handle_sigint: bool, gemini_api_key:
 
     runner = PipelineRunner(handle_sigint=handle_sigint)
 
+    t_C = time.perf_counter()
+    print(f"[TIMESTAMP C] Pipecat pipeline is ready: {t_C}")
+
     await runner.run(task)
 
 
@@ -166,6 +187,9 @@ async def bot(runner_args: RunnerArguments, call_id: str = None, stream_id: str 
     env_sample_rate = int(os.getenv("VOBIZ_SAMPLE_RATE", "8000"))
 
     parsed = await parse_vobiz_start(runner_args.websocket)
+    t_B = time.perf_counter()
+    print(f"[TIMESTAMP B] First Vobiz start frame reaches the bot: {t_B}")
+    
     logger.info(
         f"Vobiz start: callId={parsed['call_id']!r}, streamId={parsed['stream_id']!r}, "
         f"mediaFormat=({parsed['encoding']!r}, {parsed['sample_rate']})"

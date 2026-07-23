@@ -11,6 +11,7 @@ import json
 import os
 import ssl
 import urllib.parse
+import time
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Dict, Optional, Tuple
@@ -26,6 +27,8 @@ from pydantic import BaseModel
 # Import bot and Pipecat components at startup to prevent blocking the event loop later
 from bot import bot
 from pipecat.runner.types import WebSocketRunnerArguments
+from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
+from pipecat.services.google.gemini_live.llm import GeminiLiveLLMService
 
 load_dotenv(override=True)
 
@@ -40,71 +43,71 @@ active_calls = {}
 # ----------------- HELPERS ----------------- #
 
 
-    async def make_vobiz_call(
-        session: aiohttp.ClientSession, to_number: str, from_number: str, answer_url: str
-    ):
-        """Make an outbound call using Vobiz's REST API."""
-        print("\n[DEBUG] ========== VOBIZ API CALL START ==========")
+async def make_vobiz_call(
+    session: aiohttp.ClientSession, to_number: str, from_number: str, answer_url: str
+):
+    """Make an outbound call using Vobiz's REST API."""
+    print("\n[DEBUG] ========== VOBIZ API CALL START ==========")
 
-        auth_id = os.getenv("VOBIZ_AUTH_ID")
-        auth_token = os.getenv("VOBIZ_AUTH_TOKEN")
+    auth_id = os.getenv("VOBIZ_AUTH_ID")
+    auth_token = os.getenv("VOBIZ_AUTH_TOKEN")
 
-        if not auth_id:
-            raise ValueError("Missing Vobiz Auth ID (VOBIZ_AUTH_ID)")
+    if not auth_id:
+        raise ValueError("Missing Vobiz Auth ID (VOBIZ_AUTH_ID)")
 
-        if not auth_token:
-            raise ValueError("Missing Vobiz Auth Token (VOBIZ_AUTH_TOKEN)")
+    if not auth_token:
+        raise ValueError("Missing Vobiz Auth Token (VOBIZ_AUTH_TOKEN)")
 
-        print(f"[DEBUG] Auth ID: {auth_id}")
-        # Log only the last 4 chars so we can tell tokens apart in logs without
-        # leaking ~50% of the secret. Drop the whole line if even that is too much.
-        print(f"[DEBUG] Auth Token: …{auth_token[-4:]}")
+    print(f"[DEBUG] Auth ID: {auth_id}")
+    # Log only the last 4 chars so we can tell tokens apart in logs without
+    # leaking ~50% of the secret. Drop the whole line if even that is too much.
+    print(f"[DEBUG] Auth Token: …{auth_token[-4:]}")
 
-        headers = {
-            "Content-Type": "application/json",
-            "X-Auth-ID": auth_id,
-            "X-Auth-Token": auth_token,
-        }
+    headers = {
+        "Content-Type": "application/json",
+        "X-Auth-ID": auth_id,
+        "X-Auth-Token": auth_token,
+    }
 
-        data = {
-            "to": to_number,
-            "from": from_number,
-            "answer_url": answer_url,
-            "answer_method": "POST",
-        }
+    data = {
+        "to": to_number,
+        "from": from_number,
+        "answer_url": answer_url,
+        "answer_method": "POST",
+    }
 
-        url = f"https://api.vobiz.ai/api/v1/Account/{auth_id}/Call/"
+    url = f"https://api.vobiz.ai/api/v1/Account/{auth_id}/Call/"
 
-        print(f"[DEBUG] API URL: {url}")
-        print(f"[DEBUG] Request Headers: {headers}")
-        print(f"[DEBUG] Request Body: {json.dumps(data, indent=2)}")
-        print(f"[DEBUG] Answer URL being sent: {answer_url}")
+    print(f"[DEBUG] API URL: {url}")
+    print(f"[DEBUG] Request Headers: {headers}")
+    print(f"[DEBUG] Request Body: {json.dumps(data, indent=2)}")
+    print(f"[DEBUG] Answer URL being sent: {answer_url}")
 
-        try:
-            async with session.post(url, headers=headers, json=data) as response:
-                response_text = await response.text()
-                print(f"[DEBUG] Response Status: {response.status}")
-                print(f"[DEBUG] Response Body: {response_text}")
+    try:
+        async with session.post(url, headers=headers, json=data) as response:
+            response_text = await response.text()
+            print(f"[DEBUG] Response Status: {response.status}")
+            print(f"[DEBUG] Response Body: {response_text}")
 
-                if response.status != 201:
-                    print(f"[ERROR] Vobiz API call failed!")
-                    print(f"[ERROR] Status: {response.status}")
-                    print(f"[ERROR] Response: {response_text}")
-                    raise Exception(f"Vobiz API error ({response.status}): {response_text}")
+            if response.status != 201:
+                print(f"[ERROR] Vobiz API call failed!")
+                print(f"[ERROR] Status: {response.status}")
+                print(f"[ERROR] Response: {response_text}")
+                raise Exception(f"Vobiz API error ({response.status}): {response_text}")
 
-                result = json.loads(response_text)
-                print(f"[SUCCESS] Vobiz API call successful!")
-                print(f"[SUCCESS] Call UUID: {result.get('call_uuid', 'N/A')}")
-                print("[DEBUG] ========== VOBIZ API CALL END ==========\n")
-                return result
+            result = json.loads(response_text)
+            print(f"[SUCCESS] Vobiz API call successful!")
+            print(f"[SUCCESS] Call UUID: {result.get('call_uuid', 'N/A')}")
+            print("[DEBUG] ========== VOBIZ API CALL END ==========\n")
+            return result
 
-        except Exception as e:
-            print(f"[ERROR] Exception during Vobiz API call: {e}")
-            print(f"[ERROR] Exception type: {type(e).__name__}")
-            import traceback
-            print(f"[ERROR] Traceback:\n{traceback.format_exc()}")
-            print("[DEBUG] ========== VOBIZ API CALL END (WITH ERROR) ==========\n")
-            raise
+    except Exception as e:
+        print(f"[ERROR] Exception during Vobiz API call: {e}")
+        print(f"[ERROR] Exception type: {type(e).__name__}")
+        import traceback
+        print(f"[ERROR] Traceback:\n{traceback.format_exc()}")
+        print("[DEBUG] ========== VOBIZ API CALL END (WITH ERROR) ==========\n")
+        raise
 
 
 def get_host_and_protocol(request: Request = None):
@@ -178,7 +181,8 @@ def get_websocket_url(host: str):
         prod_ws_url = os.getenv("VOBIZ_PROD_WS_URL")
         if not prod_ws_url:
             region = os.getenv("REGION", "ap-south")
-            prod_ws_url = f"wss://{region}.api.pipecat.daily.co/ws/generic"
+            prod_ws_url=f"wss://{host}/ws"
+            # prod_ws_url = f"wss://{region}.api.pipecat.daily.co/ws/generic"
         return prod_ws_url
     else:
         # Return WebSocket URL for local/ngrok deployment
@@ -193,6 +197,23 @@ def get_websocket_url(host: str):
 async def lifespan(app: FastAPI):
     # Create aiohttp session for Vobiz API calls
     app.state.session = aiohttp.ClientSession()
+    # ── PREWARM ──────────────────────────────────────────────
+    # Log me dekha ~1.12s ka silent gap tha (SDK imports + Smart
+    # Turn ONNX model load) jo pehli real call pe hi laga. Ye
+    # block usko boot time pe hi force karta hai.
+    t0 = time.perf_counter()
+    try:
+        _ = LocalSmartTurnAnalyzerV3()  # ONNX model ko memory me load karta hai
+
+        gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+        if gemini_key:
+            _ = GeminiLiveLLMService(api_key=gemini_key)  # SDK init force karta hai, koi network call nahi
+
+        print(f"[PREWARM] done in {time.perf_counter() - t0:.2f}s")
+    except Exception as e:
+        print(f"[PREWARM] skipped (non-fatal): {e}")
+    # ─────────────────────────────────────────────────────────
+
     yield
     # Close session when shutting down
     await app.state.session.close()
@@ -349,6 +370,8 @@ async def get_answer_xml(
             call_info["transfer_requested"] = False
             call_info["status"] = "transferred"
 
+            t_A = time.perf_counter()
+            print(f"[TIMESTAMP A] /answer XML returned (transfer): {t_A}")
             return HTMLResponse(content=xml_content, media_type="application/xml")
 
     # Normal flow: Return Stream XML for bot conversation
@@ -449,6 +472,8 @@ async def get_answer_xml(
         print(f"[DEBUG] XML Response:\n{xml_content}")
         print("[ANSWER] ========== ANSWER XML END (STREAM) ==========\n")
 
+        t_A = time.perf_counter()
+        print(f"[TIMESTAMP A] /answer XML returned: {t_A}")
         return HTMLResponse(content=xml_content, media_type="application/xml")
 
     except Exception as e:

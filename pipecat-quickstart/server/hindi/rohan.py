@@ -125,7 +125,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments) -> Non
                 start_sensitivity="START_SENSITIVITY_HIGH",
                 end_sensitivity="END_SENSITIVITY_LOW",
                 prefix_padding_ms=0,
-                silence_duration_ms=300,
+                silence_duration_ms=100,
             ),
             thinking={"thinking_budget": 0},
         ),

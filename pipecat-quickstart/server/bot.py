@@ -5,6 +5,7 @@
 #
 
 import os
+import time
 
 from dotenv import load_dotenv
 from loguru import logger
@@ -17,28 +18,46 @@ from pipecat.runner.types import RunnerArguments
 from pipecat.serializers.vobiz import VobizFrameSerializer, parse_vobiz_start
 from pipecat.services.google.gemini_live.llm import GeminiLiveLLMService, GeminiVADParams
 from pipecat.frames.frames import LLMRunFrame
+from pipecat.processors.frame_processor import FrameProcessor, FrameDirection
 from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.websocket.fastapi import (
     FastAPIWebsocketParams,
     FastAPIWebsocketTransport,
 )
-from pipecat.adapters.schemas.function_schema import FunctionSchema
-from pipecat.services.llm_service import FunctionCallParams
-from pipecatcloud.agent import PipecatSessionArguments
 from instructions import SYSTEM_PROMPT
 
-# ── YASH / RENTOPUS KNOWLEDGE BASE & FUNCTION CALL ──
+load_dotenv(override=True)
 
-from tools import cyberarcmsp_info_tool
+
+class FirstAudioLogProcessor(FrameProcessor):
+    """Logs a timestamp the instant the bot's first audio frame leaves the pipeline (T_D)."""
+
+    def __init__(self):
+        super().__init__()
+        self.logged = False
+
+    async def process_frame(self, frame, direction):
+        await super().process_frame(frame, direction)
+
+        if (
+            not self.logged
+            and type(frame).__name__ in ("AudioRawFrame", "TTSAudioRawFrame", "OutputAudioRawFrame")
+            and direction == FrameDirection.DOWNSTREAM
+        ):
+            t_D = time.perf_counter()
+            print(f"[TIMESTAMP D] First audio / playAudio bytes leave: {t_D}")
+            self.logged = True
+
+        await self.push_frame(frame, direction)
 
 
 async def run_bot(
-    transport: BaseTransport, 
-    handle_sigint: bool, 
+    transport: BaseTransport,
+    handle_sigint: bool,
     gemini_api_key: str = None,
     contact_name: str = None,
     contact_number: str = None,
-    customer_number: str = None
+    customer_number: str = None,
 ):
     logger.info("Initializing Rohan (CyberArcMSP Sales Voice Assistant)")
     llm = GeminiLiveLLMService(
@@ -56,18 +75,19 @@ async def run_bot(
             ),
             thinking={"thinking_budget": 0},
         ),
-        tools=[cyberarcmsp_info_tool],
-        system_instruction=SYSTEM_PROMPT
+        system_instruction=SYSTEM_PROMPT,
     )
 
     context = LLMContext()
     context_aggregator = LLMContextAggregatorPair(context, realtime_service_mode=True)
+    first_audio_logger = FirstAudioLogProcessor()
 
     pipeline = Pipeline(
         [
             transport.input(),  # Websocket input from client
             context_aggregator.user(),
-            llm, 
+            llm,
+            first_audio_logger,  # T_D: first bot audio out
             transport.output(),  # Websocket output to client
             context_aggregator.assistant(),
         ]
@@ -90,10 +110,10 @@ async def run_bot(
             greeting_prompt = f"User just answered the phone. Please greet them exactly by saying: 'Hello {contact_name}... Mera naam Rohan hai CyberArcMSP se. Kaise hain aap?' Make sure to pause slightly after their name."
         else:
             greeting_prompt = "User just answered the phone. Please greet them exactly by saying: 'Hello... Mera naam Rohan hai CyberArcMSP se. Kaise hain aap?' Make sure to pause slightly after hello."
-            
+
         if customer_number:
             greeting_prompt += f" For your context, their customer number is {customer_number}."
-            
+
         context.add_message({
             "role": "user",
             "content": greeting_prompt
@@ -107,11 +127,14 @@ async def run_bot(
 
     runner = PipelineRunner(handle_sigint=handle_sigint)
 
+    t_C = time.perf_counter()
+    print(f"[TIMESTAMP C] Pipecat pipeline is ready: {t_C}")
+
     await runner.run(task)
 
 
 async def bot(runner_args: RunnerArguments, call_id: str = None, stream_id: str = None, gemini_api_key: str = None):
-    """Main bot entry point compatible with Pipecat Cloud."""
+    """Main bot entry point — used by server.py (self-hosted Vobiz webhook server)."""
     contact_name = None
     contact_number = None
     customer_number = None
@@ -145,6 +168,9 @@ async def bot(runner_args: RunnerArguments, call_id: str = None, stream_id: str 
         env_sample_rate = int(os.getenv("VOBIZ_SAMPLE_RATE", "8000"))
 
         parsed = await parse_vobiz_start(runner_args.websocket)
+        t_B = time.perf_counter()
+        print(f"[TIMESTAMP B] First Vobiz start frame reaches the bot: {t_B}")
+
         logger.info(
             f"Vobiz start: callId={parsed['call_id']!r}, streamId={parsed['stream_id']!r}, "
             f"mediaFormat=({parsed['encoding']!r}, {parsed['sample_rate']})"
@@ -181,7 +207,7 @@ async def bot(runner_args: RunnerArguments, call_id: str = None, stream_id: str 
         # Fall back to standard WebRTC (for local dashboard testing)
         from pipecat.runner.utils import create_transport
         from pipecat.transports.base_transport import TransportParams
-        
+
         logger.info("Initializing bot in standard WebRTC mode for local testing")
         transport_params = {
             "webrtc": lambda: TransportParams(audio_in_enabled=True, audio_out_enabled=True),
@@ -189,16 +215,15 @@ async def bot(runner_args: RunnerArguments, call_id: str = None, stream_id: str 
         transport = await create_transport(runner_args, transport_params)
 
     await run_bot(
-        transport, 
-        handle_sigint, 
+        transport,
+        handle_sigint,
         gemini_api_key=gemini_api_key,
         contact_name=contact_name,
         contact_number=contact_number,
-        customer_number=customer_number
+        customer_number=customer_number,
     )
 
 
-    
 if __name__ == "__main__":
     from pipecat.runner.run import main
     main()
