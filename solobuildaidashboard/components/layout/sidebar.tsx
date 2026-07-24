@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import toast from "react-hot-toast";
+import { useUser } from "@clerk/nextjs";
 import { fetchWithAuth } from "@/lib/api";
 import {
   LayoutDashboard,
@@ -16,11 +16,14 @@ import {
   Zap,
   Phone,
   Delete,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useCampaigns } from "@/lib/campaign-store";
+import { useClerk } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -32,6 +35,9 @@ const navigation = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { signOut } = useClerk();
+  const { user, isLoaded } = useUser();
   const { refreshCallLogs } = useCampaigns();
   const [isDialerOpen, setIsDialerOpen] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -39,6 +45,9 @@ export function Sidebar() {
   const [customerNumber, setCustomerNumber] = useState("");
   const [callingState, setCallingState] = useState<"idle" | "calling" | "success" | "error">("idle");
   const [statusMessage, setStatusMessage] = useState("");
+  // DB client name as fallback (e.g. when client was created with a company name)
+  const [dbClientName, setDbClientName] = useState("");
+  const [dbClientEmail, setDbClientEmail] = useState("");
 
   const handleKeyPress = (num: string) => {
     setPhoneNumber((prev) => prev + num);
@@ -89,29 +98,43 @@ export function Sidebar() {
     }
   };
 
-  const [userName, setUserName] = useState("User");
-  const [userEmail, setUserEmail] = useState("");
-  const [userInitials, setUserInitials] = useState("U");
-
+  // Fetch DB client for company/org name fallback
   useEffect(() => {
-    const userStr = sessionStorage.getItem("solobuild_user");
-    if (userStr) {
+    async function fetchDbClient() {
       try {
-        const user = JSON.parse(userStr);
-        setUserName(user.name || "User");
-        setUserEmail(user.email || "");
-        if (user.name) {
-          const initials = user.name
-            .split(" ")
-            .map((n: string) => n[0])
-            .join("")
-            .substring(0, 2)
-            .toUpperCase();
-          setUserInitials(initials || "U");
+        const res = await fetchWithAuth("/api/settings");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.name) setDbClientName(data.name);
+          if (data.email) setDbClientEmail(data.email);
         }
       } catch (e) {}
     }
+    fetchDbClient();
   }, []);
+
+  // Derive display values — prefer Clerk user data, fall back to DB client
+  const displayName = user
+    ? `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.username || dbClientName || "User"
+    : dbClientName || "User";
+
+  const displayEmail = user
+    ? user.primaryEmailAddress?.emailAddress || dbClientEmail || ""
+    : dbClientEmail || "";
+
+  const displayInitials = displayName
+    .split(" ")
+    .filter(Boolean)
+    .map((n) => n[0])
+    .join("")
+    .substring(0, 2)
+    .toUpperCase() || "U";
+
+  const handleSignOut = async () => {
+    await signOut();
+    router.replace("/login");
+  };
+
 
   return (
     <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col bg-sidebar border-r border-border">
@@ -172,17 +195,46 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Footer */}
+      {/* Footer — dynamic user info from Clerk */}
       <div className="border-t border-slate-700/50 px-3 py-3">
-        <div className="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-white/5 transition-colors cursor-pointer">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-[11px] font-bold text-white uppercase">
-            {userInitials}
+        {!isLoaded ? (
+          // Loading skeleton
+          <div className="flex items-center gap-3 px-3 py-2">
+            <div className="h-8 w-8 rounded-full bg-white/10 animate-pulse" />
+            <div className="flex-1 space-y-1.5">
+              <div className="h-3 w-24 rounded bg-white/10 animate-pulse" />
+              <div className="h-2.5 w-32 rounded bg-white/10 animate-pulse" />
+            </div>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="truncate text-sm font-medium text-sidebar-foreground">{userName}</p>
-            <p className="truncate text-[11px] text-muted-foreground">{userEmail || "Admin"}</p>
+        ) : (
+          <div className="group flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-white/5 transition-colors">
+            {/* Avatar */}
+            {user?.imageUrl ? (
+              <img
+                src={user.imageUrl}
+                alt={displayName}
+                className="h-8 w-8 rounded-full object-cover ring-1 ring-white/10"
+              />
+            ) : (
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-[11px] font-bold text-white uppercase shrink-0">
+                {displayInitials}
+              </div>
+            )}
+            {/* Name + email */}
+            <div className="flex-1 min-w-0">
+              <p className="truncate text-sm font-medium text-sidebar-foreground">{displayName}</p>
+              <p className="truncate text-[11px] text-muted-foreground">{displayEmail || "Admin"}</p>
+            </div>
+            {/* Sign out button */}
+            <button
+              onClick={handleSignOut}
+              title="Sign out"
+              className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-500 hover:text-red-400 cursor-pointer"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+            </button>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Dialer Dialog Modal */}

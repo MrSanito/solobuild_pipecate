@@ -1,40 +1,55 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
-import { Agent, Client } from "@/lib/models";
-import { auth } from "@clerk/nextjs/server";
+import { Agent } from "@/lib/models";
+import { getAuthClient } from "@/lib/auth";
 
 export async function GET(req: Request) {
   try {
-    await dbConnect();
+    const { client, isAuthenticated } = await getAuthClient(req);
     
-    const { userId } = await auth();
-    if (!userId) {
+    if (!isAuthenticated) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const client = await Client.findOne({ clerkId: userId });
-    
     if (!client) {
       return NextResponse.json([]);
     }
 
+    await dbConnect();
     const agents = await Agent.find({ clientId: client._id }).sort({ createdAt: -1 });
     
-    // Dynamically import Call and Campaign to fetch stats
-    const { Call, Campaign } = require("@/lib/models");
+    const { Call } = require("@/lib/models");
 
-    // Map to frontend expected format
-    const formattedAgents = await Promise.all(agents.map(async (a) => {
-      // Find campaigns for this agent
-      const campaigns = await Campaign.find({ agentId: a._id });
-      const campaignIds = campaigns.map((c: any) => c._id);
+    // Count total calls for this client (used as fallback for single-agent accounts)
+    const totalClientCalls = await Call.countDocuments({ clientId: client._id });
+    const isSingleAgent = agents.length === 1;
 
-      // Find calls for these campaigns
-      const calls = await Call.find({ campaignId: { $in: campaignIds } });
+    const formattedAgents = await Promise.all(agents.map(async (a: any) => {
+      // Primary query: calls directly linked to this agent by ObjectId
+      const directCallsQuery = {
+        clientId: client._id,
+        agentId: a._id,
+      };
 
-      let totalCalls = calls.length;
-      let connectedCalls = calls.filter((c: any) => c.callStatus === 'answered' || c.callStatus === 'completed').length;
-      let talkTimeSeconds = calls.reduce((acc: number, c: any) => acc + (c.durationSeconds || 0), 0);
+      // Fallback query for single-agent: all client calls (catches manually dialled
+      // calls that were initiated without an agentId in the request)
+      const statsQuery = isSingleAgent
+        ? { clientId: client._id } // all calls belong to the one agent
+        : directCallsQuery;
+
+      const [totalCalls, connectedCalls, talkTimeAgg] = await Promise.all([
+        Call.countDocuments(statsQuery),
+        Call.countDocuments({
+          ...statsQuery,
+          callStatus: { $in: ['answered', 'completed'] },
+        }),
+        Call.aggregate([
+          { $match: statsQuery },
+          { $group: { _id: null, total: { $sum: '$durationSeconds' } } },
+        ]),
+      ]);
+
+      const talkTimeSeconds = talkTimeAgg[0]?.total || 0;
 
       return {
         id: a._id.toString(),
@@ -50,7 +65,7 @@ export async function GET(req: Request) {
         status: "Active",
         totalCalls,
         connectedCalls,
-        talkTimeSeconds
+        talkTimeSeconds,
       };
     }));
 
@@ -63,22 +78,14 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    await dbConnect();
+    const { client, isAuthenticated } = await getAuthClient(req);
     
-    const { userId } = await auth();
-    if (!userId) {
+    if (!isAuthenticated || !client) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const client = await Client.findOne({ clerkId: userId });
-
-
-    
-    if (!client) {
-      return NextResponse.json({ error: "No client found" }, { status: 400 });
-    }
-
     const body = await req.json();
+    await dbConnect();
     
     if (body.id && body.id.length === 24) { // valid objectId
       const updated = await Agent.findOneAndUpdate(

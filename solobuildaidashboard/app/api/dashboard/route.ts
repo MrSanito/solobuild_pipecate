@@ -23,11 +23,16 @@ export async function GET(req: Request) {
     const campaigns = await campaignsRes.json();
     const agents = await agentsRes.json();
     const callLogs = await callsRes.json();
+    
+    const totalCallsCount = Number(callsRes.headers.get("x-total-count")) || (Array.isArray(callLogs) ? callLogs.length : 0);
+    const completedCallsCount = Number(callsRes.headers.get("x-completed-count")) || (Array.isArray(callLogs) ? callLogs.filter((l: any) => l.status === "Completed").length : 0);
 
     return NextResponse.json({
       campaigns: campaigns.error ? [] : campaigns,
       agents: agents.error ? [] : agents,
-      callLogs: callLogs.error ? [] : callLogs
+      callLogs: callLogs.error ? [] : callLogs,
+      totalCallsCount,
+      completedCallsCount
     });
   } catch (error: any) {
     console.error("Dashboard aggregated fetch error:", error);

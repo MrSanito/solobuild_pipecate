@@ -3,11 +3,10 @@
 import { useAuth, useSignUp } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, ShieldCheck, RefreshCw } from 'lucide-react'
-import { useState } from 'react'
+import { Eye, EyeOff, Loader2, AlertCircle, ShieldCheck, RefreshCw } from 'lucide-react'
+import { useState, useEffect } from 'react'
 
 export default function Page() {
   const { signUp, errors, fetchStatus } = useSignUp()
@@ -24,50 +23,25 @@ export default function Page() {
     const firstName = formData.get('firstName') as string
     const lastName = formData.get('lastName') as string
 
-    const { error } = await signUp.password({
-      emailAddress,
-      password,
-      firstName,
-      lastName,
-      unsafeMetadata: {
-        role: "client"
-      }
-    })
-    if (error) {
-      console.error(JSON.stringify(error, null, 2))
-      return
-    }
-
+    const { error } = await signUp.password({ emailAddress, password, firstName, lastName, unsafeMetadata: { role: "client" } })
+    if (error) { console.error(JSON.stringify(error, null, 2)); return }
     if (!error) await signUp.verifications.sendEmailCode()
   }
 
   const handleVerify = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-
     setVerifyError('')
     const formData = new FormData(e.currentTarget)
     const code = formData.get('code') as string
 
     try {
       await signUp.verifications.verifyEmailCode({ code })
-
       if (signUp.status === 'complete') {
-        // finalize() sets the active session AND handles navigation —
-        // this replaces the old setActive() + window.location.href pattern,
-        // which no longer works because useSignUp() doesn't return setActive
-        // in this version of Clerk.
         await signUp.finalize({
           navigate: ({ session, decorateUrl }) => {
-            if (session?.currentTask) {
-              console.log(session.currentTask)
-              return
-            }
+            if (session?.currentTask) { console.log(session.currentTask); return }
             const url = decorateUrl('/dashboard')
-            if (url.startsWith('http')) {
-              window.location.href = url
-            } else {
-              router.push(url)
-            }
+            if (url.startsWith('http')) { window.location.href = url } else { router.push(url) }
           },
         })
       } else {
@@ -76,317 +50,154 @@ export default function Page() {
       }
     } catch (err: any) {
       console.error('Error verifying email:', err)
-      const msg = err.errors?.[0]?.longMessage || err.errors?.[0]?.message || 'Invalid verification code'
-      setVerifyError(msg)
+      setVerifyError(err.errors?.[0]?.longMessage || err.errors?.[0]?.message || 'Invalid verification code')
     }
   }
 
-  // Note: the separate useEffect that used to also redirect on
-  // signUp.status === 'complete' / isSignedIn has been removed.
-  // signUp.finalize()'s navigate callback now owns the redirect,
-  // so there's only one code path doing it (no race condition).
+  useEffect(() => {
+    if (isSignedIn) router.replace('/dashboard')
+  }, [isSignedIn, router])
 
-  if (signUp.status === 'complete' || isSignedIn) {
-    return null
+  if (isSignedIn) {
+    return (
+      <div className="flex min-h-screen w-full items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3 text-muted-foreground">
+          <div className="h-5 w-5 animate-spin rounded-full border-2 border-border border-t-primary" />
+          <span className="text-xs">Redirecting...</span>
+        </div>
+      </div>
+    )
   }
 
-  // ── PHASE 2: Email Verification Code ──
-  if (
-    signUp.status === 'missing_requirements' &&
-    signUp.unverifiedFields.includes('email_address') &&
-    signUp.missingFields.length === 0
-  ) {
+  if (signUp.status === 'complete') return null
+
+  // ── PHASE 2: Email Verification ──
+  if (signUp.status === 'missing_requirements' && signUp.unverifiedFields.includes('email_address') && signUp.missingFields.length === 0) {
     return (
-      <div className="relative flex min-h-screen w-full items-center justify-center bg-[#030712] px-4 font-sans overflow-hidden">
-        <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-indigo-500/10 blur-[120px] pointer-events-none" />
-        <div className="absolute bottom-1/4 right-1/4 translate-x-1/2 translate-y-1/2 w-[600px] h-[600px] rounded-full bg-violet-600/10 blur-[130px] pointer-events-none" />
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#1f29370a_1px,transparent_1px),linear-gradient(to_bottom,#1f29370a_1px,transparent_1px)] bg-[size:14px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] pointer-events-none" />
-
-        <Card className="relative w-full max-w-md border-neutral-800/80 bg-neutral-950/40 backdrop-blur-xl shadow-[0_0_50px_rgba(99,102,241,0.08)] text-white overflow-hidden transition-all duration-300 hover:shadow-[0_0_50px_rgba(99,102,241,0.12)]">
-          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-indigo-500 to-violet-600" />
-
-          <CardHeader className="text-center space-y-3 pt-8 pb-6">
-            <div className="flex justify-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
-                <ShieldCheck className="h-8 w-8" />
-              </div>
+      <div className="flex min-h-screen w-full items-center justify-center bg-background px-4">
+        <div className="w-full max-w-sm">
+          <div className="mb-8 text-center">
+            <div className="mx-auto mb-5 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 border border-primary/20">
+              <ShieldCheck className="h-5 w-5 text-primary" />
             </div>
-            <div className="space-y-1">
-              <CardTitle className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-slate-100 via-white to-slate-400 bg-clip-text text-transparent">
-                Verify Email
-              </CardTitle>
-              <CardDescription className="text-neutral-400 text-sm">
-                Enter the verification code sent to your email
-              </CardDescription>
-            </div>
-          </CardHeader>
+            <h1 className="text-xl font-semibold text-foreground">Check your email</h1>
+            <p className="mt-1.5 text-sm text-muted-foreground">Enter the code we sent to verify your account</p>
+          </div>
 
-          <form onSubmit={handleVerify}>
-            <CardContent className="space-y-5 px-6 pb-6">
-              {/* Global errors */}
-              {errors?.global && (
-                <div className="flex items-start gap-2.5 rounded-lg border border-red-500/30 bg-red-500/10 p-3.5 text-xs text-red-400">
-                  <AlertCircle className="h-4 w-4 shrink-0 text-red-400 mt-0.5" />
-                  <span className="leading-relaxed">{errors.global.map((e: any) => e.message).join('. ')}</span>
-                </div>
-              )}
-
-              {/* Verify API Error */}
-              {verifyError && (
-                <div className="flex items-start gap-2.5 rounded-lg border border-red-500/30 bg-red-500/10 p-3.5 text-xs text-red-400">
-                  <AlertCircle className="h-4 w-4 shrink-0 text-red-400 mt-0.5" />
-                  <span className="leading-relaxed">{verifyError}</span>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <label className="text-xs font-semibold tracking-wider uppercase text-neutral-400" htmlFor="code">
-                  Verification Code
-                </label>
-                <Input
-                  id="code"
-                  name="code"
-                  type="text"
-                  placeholder="Enter 6-digit code"
-                  autoComplete="one-time-code"
-                  className={`h-11 border-neutral-800/80 bg-neutral-950/80 text-white rounded-lg text-sm text-center tracking-[0.3em] font-mono text-lg placeholder:text-neutral-600 placeholder:tracking-normal placeholder:font-sans placeholder:text-sm focus-visible:ring-1 transition-all duration-200 ${
-                    errors?.fields?.code || verifyError
-                      ? 'border-red-500/50 focus-visible:border-red-500/50 focus-visible:ring-red-500/30'
-                      : 'focus-visible:border-indigo-500/50 focus-visible:ring-indigo-500/30'
-                  }`}
-                />
-                {errors?.fields?.code && (
-                  <p className="text-red-400 text-xs mt-1.5 flex items-center gap-1.5">
-                    <AlertCircle className="h-3 w-3 shrink-0" />
-                    {errors.fields.code.message}
-                  </p>
-                )}
+          <form onSubmit={handleVerify} className="space-y-4">
+            {errors?.global && (
+              <div className="flex items-start gap-2.5 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-red-400">
+                <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                <span>{errors.global.map((e: any) => e.message).join('. ')}</span>
               </div>
-            </CardContent>
+            )}
+            {verifyError && (
+              <div className="flex items-start gap-2.5 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-red-400">
+                <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                <span>{verifyError}</span>
+              </div>
+            )}
 
-            <CardFooter className="px-6 pb-8 flex flex-col space-y-4">
-              <Button
-                className="w-full h-11 bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700 text-white font-semibold rounded-lg text-sm transition-all duration-300 shadow-[0_0_20px_rgba(99,102,241,0.2)] hover:shadow-[0_0_25px_rgba(99,102,241,0.3)] active:scale-[0.99] gap-2 cursor-pointer disabled:opacity-50"
-                type="submit"
-                disabled={fetchStatus === 'fetching'}
-              >
-                {fetchStatus === 'fetching' ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Verifying...
-                  </>
-                ) : (
-                  'Verify Email'
-                )}
-              </Button>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="code">Verification Code</label>
+              <Input
+                id="code" name="code" type="text" placeholder="000000" autoComplete="one-time-code"
+                className={`h-10 border-border bg-card text-foreground text-center tracking-[0.4em] font-mono text-base placeholder:tracking-normal placeholder:text-muted rounded-lg focus-visible:ring-1 focus-visible:ring-ring focus-visible:border-primary/50 transition-colors ${(errors?.fields?.code || verifyError) ? 'border-destructive/60' : ''}`}
+              />
+              {errors?.fields?.code && (
+                <p className="text-red-400 text-xs flex items-center gap-1.5">
+                  <AlertCircle className="h-3 w-3 shrink-0" />{errors.fields.code.message}
+                </p>
+              )}
+            </div>
 
-              <button
-                type="button"
-                onClick={() => signUp.verifications.sendEmailCode()}
-                className="text-xs text-neutral-400 hover:text-indigo-300 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <RefreshCw className="h-3 w-3" />
-                Resend verification code
-              </button>
-            </CardFooter>
+            <Button className="w-full h-10 bg-primary hover:bg-primary/90 text-primary-foreground font-medium text-sm rounded-lg gap-2 disabled:opacity-40" type="submit" disabled={fetchStatus === 'fetching'}>
+              {fetchStatus === 'fetching' ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Verifying...</> : 'Verify email'}
+            </Button>
+
+            <button type="button" onClick={() => signUp.verifications.sendEmailCode()} className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-1.5 cursor-pointer pt-1">
+              <RefreshCw className="h-3 w-3" />Resend code
+            </button>
           </form>
-        </Card>
+        </div>
       </div>
     )
   }
 
   // ── PHASE 1: Sign Up Form ──
   return (
-    <div className="relative flex min-h-screen w-full items-center justify-center bg-[#030712] px-4 font-sans overflow-hidden">
-      {/* Background Aura Glows */}
-      <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-indigo-500/10 blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/4 translate-x-1/2 translate-y-1/2 w-[600px] h-[600px] rounded-full bg-violet-600/10 blur-[130px] pointer-events-none" />
+    <div className="flex min-h-screen w-full items-center justify-center bg-background px-4">
+      <div className="w-full max-w-sm">
 
-      {/* Grid Pattern Overlay */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#1f29370a_1px,transparent_1px),linear-gradient(to_bottom,#1f29370a_1px,transparent_1px)] bg-[size:14px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] pointer-events-none" />
+        <div className="mb-8 text-center">
+          <div className="mx-auto mb-5 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 border border-primary/20">
+            <span className="text-primary font-bold text-sm tracking-tight">SB</span>
+          </div>
+          <h1 className="text-xl font-semibold text-foreground">Create your account</h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">Start using SoloBuild AI today</p>
+        </div>
 
-      <Card className="relative w-full max-w-md border-neutral-800/80 bg-neutral-950/40 backdrop-blur-xl shadow-[0_0_50px_rgba(99,102,241,0.08)] text-white overflow-hidden transition-all duration-300 hover:shadow-[0_0_50px_rgba(99,102,241,0.12)]">
-        {/* Top Accent Line */}
-        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-indigo-500 to-violet-600" />
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {errors?.global && errors.global.length > 0 && (
+            <div className="flex items-start gap-2.5 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-red-400">
+              <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+              <div className="space-y-0.5">{errors.global.map((err: any, i: number) => <p key={i}>{err.message}</p>)}</div>
+            </div>
+          )}
 
-        <CardHeader className="text-center space-y-3 pt-8 pb-6">
-          <div className="flex justify-center">
-            <div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 text-xs text-indigo-300 font-medium">
-              <span className="h-2 w-2 rounded-full bg-indigo-400 pulse-dot" />
-              VoiceAI Platform
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="firstName">First name</label>
+              <Input id="firstName" type="text" name="firstName" placeholder="John" required
+                className={`h-10 border-border bg-card text-foreground rounded-lg text-sm placeholder:text-muted focus-visible:ring-1 focus-visible:ring-ring focus-visible:border-primary/50 transition-colors ${errors?.fields?.firstName ? 'border-destructive/60' : ''}`}
+              />
+              {errors?.fields?.firstName && <p className="text-red-400 text-xs flex items-center gap-1"><AlertCircle className="h-3 w-3 shrink-0" />{errors.fields.firstName.message}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="lastName">Last name</label>
+              <Input id="lastName" type="text" name="lastName" placeholder="Doe" required
+                className={`h-10 border-border bg-card text-foreground rounded-lg text-sm placeholder:text-muted focus-visible:ring-1 focus-visible:ring-ring focus-visible:border-primary/50 transition-colors ${errors?.fields?.lastName ? 'border-destructive/60' : ''}`}
+              />
+              {errors?.fields?.lastName && <p className="text-red-400 text-xs flex items-center gap-1"><AlertCircle className="h-3 w-3 shrink-0" />{errors.fields.lastName.message}</p>}
             </div>
           </div>
-          <div className="space-y-1">
-            <CardTitle className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-slate-100 via-white to-slate-400 bg-clip-text text-transparent">
-              Create Account
-            </CardTitle>
-            <CardDescription className="text-neutral-400 text-sm">
-              Register to configure your SoloBuild AI Agents
-            </CardDescription>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground" htmlFor="email">Email</label>
+            <Input id="email" type="email" name="email" placeholder="name@company.com" required
+              className={`h-10 border-border bg-card text-foreground rounded-lg text-sm placeholder:text-muted focus-visible:ring-1 focus-visible:ring-ring focus-visible:border-primary/50 transition-colors ${errors?.fields?.emailAddress ? 'border-destructive/60' : ''}`}
+            />
+            {errors?.fields?.emailAddress && <p className="text-red-400 text-xs flex items-center gap-1.5"><AlertCircle className="h-3 w-3 shrink-0" />{errors.fields.emailAddress.message}</p>}
           </div>
-        </CardHeader>
 
-        <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-5 px-6 pb-6">
-            {/* Global errors banner */}
-            {errors?.global && errors.global.length > 0 && (
-              <div className="flex items-start gap-2.5 rounded-lg border border-red-500/30 bg-red-500/10 p-3.5 text-xs text-red-400">
-                <AlertCircle className="h-4 w-4 shrink-0 text-red-400 mt-0.5" />
-                <div className="leading-relaxed space-y-1">
-                  {errors.global.map((err: any, i: number) => (
-                    <p key={i}>{err.message}</p>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-4">
-              {/* First Name field */}
-              <div className="space-y-2">
-                <label className="text-xs font-semibold tracking-wider uppercase text-neutral-400" htmlFor="firstName">
-                  First Name
-                </label>
-                <div className="relative">
-                  <Input
-                    id="firstName"
-                    type="text"
-                    name="firstName"
-                    placeholder="John"
-                    required
-                    className={`h-11 border-neutral-800/80 bg-neutral-950/80 text-white rounded-lg text-sm placeholder:text-neutral-600 focus-visible:ring-1 transition-all duration-200 ${
-                      errors?.fields?.firstName
-                        ? 'border-red-500/50 focus-visible:border-red-500/50 focus-visible:ring-red-500/30'
-                        : 'focus-visible:border-indigo-500/50 focus-visible:ring-indigo-500/30'
-                    }`}
-                  />
-                </div>
-                {errors?.fields?.firstName && (
-                  <p className="text-red-400 text-xs mt-1.5 flex items-center gap-1.5">
-                    <AlertCircle className="h-3 w-3 shrink-0" />
-                    {errors.fields.firstName.message}
-                  </p>
-                )}
-              </div>
-
-              {/* Last Name field */}
-              <div className="space-y-2">
-                <label className="text-xs font-semibold tracking-wider uppercase text-neutral-400" htmlFor="lastName">
-                  Last Name
-                </label>
-                <div className="relative">
-                  <Input
-                    id="lastName"
-                    type="text"
-                    name="lastName"
-                    placeholder="Doe"
-                    required
-                    className={`h-11 border-neutral-800/80 bg-neutral-950/80 text-white rounded-lg text-sm placeholder:text-neutral-600 focus-visible:ring-1 transition-all duration-200 ${
-                      errors?.fields?.lastName
-                        ? 'border-red-500/50 focus-visible:border-red-500/50 focus-visible:ring-red-500/30'
-                        : 'focus-visible:border-indigo-500/50 focus-visible:ring-indigo-500/30'
-                    }`}
-                  />
-                </div>
-                {errors?.fields?.lastName && (
-                  <p className="text-red-400 text-xs mt-1.5 flex items-center gap-1.5">
-                    <AlertCircle className="h-3 w-3 shrink-0" />
-                    {errors.fields.lastName.message}
-                  </p>
-                )}
-              </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground" htmlFor="password">Password</label>
+            <div className="relative">
+              <Input id="password" type={showPassword ? 'text' : 'password'} name="password" placeholder="Min. 8 characters" required
+                className={`h-10 pr-10 border-border bg-card text-foreground rounded-lg text-sm placeholder:text-muted focus-visible:ring-1 focus-visible:ring-ring focus-visible:border-primary/50 transition-colors ${errors?.fields?.password ? 'border-destructive/60' : ''}`}
+              />
+              <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
             </div>
+            {errors?.fields?.password && <p className="text-red-400 text-xs flex items-center gap-1.5"><AlertCircle className="h-3 w-3 shrink-0" />{errors.fields.password.message}</p>}
+          </div>
 
-            {/* Email field */}
-            <div className="space-y-2">
-              <label className="text-xs font-semibold tracking-wider uppercase text-neutral-400" htmlFor="email">
-                Email Address
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-500" />
-                <Input
-                  id="email"
-                  type="email"
-                  name="email"
-                  placeholder="name@company.com"
-                  required
-                  className={`pl-10.5 h-11 border-neutral-800/80 bg-neutral-950/80 text-white rounded-lg text-sm placeholder:text-neutral-600 focus-visible:ring-1 transition-all duration-200 ${
-                    errors?.fields?.emailAddress
-                      ? 'border-red-500/50 focus-visible:border-red-500/50 focus-visible:ring-red-500/30'
-                      : 'focus-visible:border-indigo-500/50 focus-visible:ring-indigo-500/30'
-                  }`}
-                />
-              </div>
-              {errors?.fields?.emailAddress && (
-                <p className="text-red-400 text-xs mt-1.5 flex items-center gap-1.5">
-                  <AlertCircle className="h-3 w-3 shrink-0" />
-                  {errors.fields.emailAddress.message}
-                </p>
-              )}
-            </div>
+          <Button className="w-full h-10 bg-primary hover:bg-primary/90 text-primary-foreground font-medium text-sm rounded-lg gap-2 disabled:opacity-40 mt-2" type="submit" disabled={fetchStatus === 'fetching'}>
+            {fetchStatus === 'fetching' ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Creating account...</> : 'Create account'}
+          </Button>
 
-            {/* Password field */}
-            <div className="space-y-2">
-              <label className="text-xs font-semibold tracking-wider uppercase text-neutral-400" htmlFor="password">
-                Password
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-500" />
-                <Input
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  name="password"
-                  placeholder="••••••••"
-                  required
-                  className={`pl-10.5 pr-10.5 h-11 border-neutral-800/80 bg-neutral-950/80 text-white rounded-lg text-sm placeholder:text-neutral-600 focus-visible:ring-1 transition-all duration-200 ${
-                    errors?.fields?.password
-                      ? 'border-red-500/50 focus-visible:border-red-500/50 focus-visible:ring-red-500/30'
-                      : 'focus-visible:border-indigo-500/50 focus-visible:ring-indigo-500/30'
-                  }`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300 transition-colors cursor-pointer"
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-              {errors?.fields?.password && (
-                <p className="text-red-400 text-xs mt-1.5 flex items-center gap-1.5">
-                  <AlertCircle className="h-3 w-3 shrink-0" />
-                  {errors.fields.password.message}
-                </p>
-              )}
-            </div>
-          </CardContent>
-
-          <CardFooter className="px-6 pb-8 flex flex-col space-y-4">
-            <Button
-              className="w-full h-11 bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700 text-white font-semibold rounded-lg text-sm transition-all duration-300 shadow-[0_0_20px_rgba(99,102,241,0.2)] hover:shadow-[0_0_25px_rgba(99,102,241,0.3)] active:scale-[0.99] gap-2 cursor-pointer disabled:opacity-50"
-              type="submit"
-              disabled={fetchStatus === 'fetching'}
-            >
-              {fetchStatus === 'fetching' ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Creating account...
-                </>
-              ) : (
-                'Create Account'
-              )}
-            </Button>
-            <p className="text-xs text-neutral-400 text-center">
-              Already have an account?{' '}
-              <Link href="/login" className="text-indigo-400 hover:text-indigo-300 transition-colors font-medium">
-                Sign in
-              </Link>
-            </p>
-          </CardFooter>
+          <div id="clerk-captcha" />
         </form>
 
-        {/* Required for sign-up flows. Clerk's bot sign-up protection is enabled by default */}
-        <div id="clerk-captcha" />
-      </Card>
+        <p className="mt-6 text-center text-xs text-muted-foreground">
+          Already have an account?{' '}
+          <Link href="/login" className="text-primary hover:text-primary/80 transition-colors font-medium">Sign in</Link>
+        </p>
+
+        <div className="mt-8 border-t border-border" />
+        <p className="mt-4 text-center text-[10px] text-muted-foreground/40">Protected by SoloBuild AI</p>
+      </div>
     </div>
   )
 }

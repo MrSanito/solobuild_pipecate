@@ -39,18 +39,22 @@ export function Navbar() {
 
   useEffect(() => {
     // 1. First, quickly set user data from sessionStorage to prevent "Loading..." flicker
-    const userStr = sessionStorage.getItem("solobuild_user");
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        setUserName(user.name || "User");
-        setUserEmail(user.email || "");
-        if (user.name) {
-          const initials = user.name.split(" ").map((n: string) => n[0]).join("").substring(0, 2).toUpperCase();
-          setUserInitials(initials || "U");
-        }
-      } catch (e) {}
-    }
+    const handleUpdate = () => {
+      const userStr = sessionStorage.getItem("solobuild_user");
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          setUserName(user.name || "User");
+          setUserEmail(user.email || "");
+          if (user.name) {
+            const initials = user.name.split(" ").map((n: string) => n[0]).join("").substring(0, 2).toUpperCase();
+            setUserInitials(initials || "U");
+          }
+        } catch (e) {}
+      }
+    };
+
+    handleUpdate();
 
     // 2. Background fetch to get fresh data just in case it updated
     async function fetchUser() {
@@ -70,6 +74,18 @@ export function Navbar() {
               .toUpperCase();
             setUserInitials(initials || "U");
           }
+
+          // Sync back to sessionStorage
+          const clientSafe = {
+            _id: clientData._id,
+            name: clientData.name,
+            email: clientData.email,
+            slug: clientData.slug,
+            plan: clientData.plan,
+          };
+          sessionStorage.setItem("solobuild_user", JSON.stringify(clientSafe));
+          // Dispatch event in case someone else is listening
+          window.dispatchEvent(new Event("solobuild_user_updated"));
         }
       } catch (error) {
         console.error("Failed to fetch user for navbar", error);
@@ -80,6 +96,11 @@ export function Navbar() {
     if (sessionStorage.getItem("solobuild_token")) {
       fetchUser();
     }
+
+    window.addEventListener("solobuild_user_updated", handleUpdate);
+    return () => {
+      window.removeEventListener("solobuild_user_updated", handleUpdate);
+    };
   }, []);
 
   return (

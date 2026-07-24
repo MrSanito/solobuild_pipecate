@@ -173,7 +173,7 @@ const AgentSchema = new Schema<IAgent>(
     name: { type: String, required: true },
     agentName: { type: String, required: true },
     orgName: { type: String, required: true },
-    prompt: { type: String, required: true },
+    prompt: { type: String, default: '' },
     voice: { type: String, default: 'Puck' },
     language: { type: String, default: 'hi-IN' },
     aiModel: { type: String, default: 'gemini-3.1-flash-live-preview' },
@@ -279,6 +279,7 @@ const CallAnalysisSchema = new Schema<ICallAnalysis>(
 
 export interface ICall extends Document {
   clientId: Types.ObjectId;
+  agentId?: Types.ObjectId;
   campaignId?: Types.ObjectId;
   contactId?: Types.ObjectId;
   direction: 'outbound' | 'inbound';
@@ -306,6 +307,7 @@ export interface ICall extends Document {
 const CallSchema = new Schema<ICall>(
   {
     clientId: { type: Schema.Types.ObjectId, ref: 'Client', required: true, index: true },
+    agentId: { type: Schema.Types.ObjectId, ref: 'Agent', index: true },
     campaignId: { type: Schema.Types.ObjectId, ref: 'Campaign', index: true },
     contactId: { type: Schema.Types.ObjectId, index: true },
     direction: { type: String, enum: ['outbound', 'inbound'], required: true },

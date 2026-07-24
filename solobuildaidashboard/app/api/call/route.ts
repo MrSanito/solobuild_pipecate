@@ -1,23 +1,30 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
-import { Call, Client } from "@/lib/models";
-import { auth } from "@clerk/nextjs/server";
+import { Call } from "@/lib/models";
+import { getAuthClient } from "@/lib/auth";
 
 export async function GET(req: Request) {
   try {
-    await dbConnect();
+    const { client, isAuthenticated } = await getAuthClient(req);
     
-    const { userId } = await auth();
-    if (!userId) {
+    if (!isAuthenticated) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const client = await Client.findOne({ clerkId: userId });
     if (!client) {
-      return NextResponse.json({ error: "Client not found" }, { status: 404 });
+      return NextResponse.json([]);
     }
 
-    const dbCalls = await Call.find({ clientId: client._id }).sort({ createdAt: -1 }).limit(50);
+    const url = new URL(req.url);
+    const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10));
+    const limit = Math.min(500, Math.max(1, parseInt(url.searchParams.get("limit") || "500", 10)));
+    const skip = (page - 1) * limit;
+
+    const [dbCalls, totalCount, completedCount] = await Promise.all([
+      Call.find({ clientId: client._id }).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Call.countDocuments({ clientId: client._id }),
+      Call.countDocuments({ clientId: client._id, callStatus: "completed" })
+    ]);
     
     const callLogs = dbCalls.map((call) => {
       const durationSeconds = call.durationSeconds || 0;
@@ -55,7 +62,13 @@ export async function GET(req: Request) {
       };
     });
 
-    return NextResponse.json(callLogs);
+    return new NextResponse(JSON.stringify(callLogs), {
+      headers: {
+        "Content-Type": "application/json",
+        "X-Total-Count": String(totalCount),
+        "X-Completed-Count": String(completedCount)
+      }
+    });
   } catch (error: any) {
     console.error("Failed to fetch call logs:", error);
     return NextResponse.json({ error: error.message || "Failed to fetch call logs" }, { status: 500 });
@@ -67,6 +80,9 @@ function mapStatus(dbStatus: string): "Completed" | "No Answer" | "Voicemail" | 
     case "completed":
       return "Completed";
     case "no_answer":
+    case "busy":
+    case "canceled":
+    case "cancelled":
       return "No Answer";
     case "voicemail":
       return "Voicemail";

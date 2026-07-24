@@ -8,6 +8,8 @@ interface CampaignContextType {
   campaigns: Campaign[];
   callLogs: CallLog[];
   agents: Agent[];
+  totalCallsCount: number;
+  completedCallsCount: number;
   addCampaign: (
     campaign: Omit<Campaign, "id" | "stats">,
     leads?: { customerName: string; phoneNumber: string; company?: string; notes?: string }[]
@@ -28,14 +30,25 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [callLogs, setCallLogs] = useState<CallLog[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [totalCallsCount, setTotalCallsCount] = useState<number>(0);
+  const [completedCallsCount, setCompletedCallsCount] = useState<number>(0);
   const initialized = React.useRef(false);
 
   const refreshCallLogs = async () => {
     try {
-      const res = await fetchWithAuth("/api/call");
+      const res = await fetchWithAuth("/api/call?limit=500");
       if (res.ok) {
+        const totalHeader = res.headers.get("x-total-count");
+        const completedHeader = res.headers.get("x-completed-count");
+        if (totalHeader) setTotalCallsCount(Number(totalHeader));
+        if (completedHeader) setCompletedCallsCount(Number(completedHeader));
+
         const dbLogs = await res.json();
-        if (Array.isArray(dbLogs)) setCallLogs(dbLogs);
+        if (Array.isArray(dbLogs)) {
+          setCallLogs(dbLogs);
+          if (!totalHeader) setTotalCallsCount(dbLogs.length);
+          if (!completedHeader) setCompletedCallsCount(dbLogs.filter(l => l.status === "Completed").length);
+        }
       }
     } catch (err) {
       console.error("Failed to load logs from database:", err);
@@ -78,6 +91,8 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
             setCampaigns(data.campaigns || []);
             setAgents(data.agents || []);
             setCallLogs(data.callLogs || []);
+            setTotalCallsCount(data.totalCallsCount || (data.callLogs ? data.callLogs.length : 0));
+            setCompletedCallsCount(data.completedCallsCount || (data.callLogs ? data.callLogs.filter((l: any) => l.status === "Completed").length : 0));
           }
         } else {
           // Fallback
@@ -146,6 +161,8 @@ export function CampaignProvider({ children }: { children: React.ReactNode }) {
         campaigns,
         callLogs,
         agents,
+        totalCallsCount,
+        completedCallsCount,
         addCampaign,
         addLeadsToCampaign,
         importCampaigns,

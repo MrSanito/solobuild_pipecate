@@ -5,11 +5,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useCampaigns } from "@/lib/campaign-store";
 
 export function KPICards() {
-  const { callLogs, agents } = useCampaigns();
+  const { callLogs, agents, totalCallsCount, completedCallsCount } = useCampaigns();
 
   // Dynamic calculations based on imported data
-  const totalCalls = callLogs.length;
-  const totalConversations = callLogs.filter((l) => l.status === "Completed").length;
+  const totalCalls = totalCallsCount !== undefined ? totalCallsCount : callLogs.length;
+  const totalConversations = completedCallsCount !== undefined ? completedCallsCount : callLogs.filter((l) => l.status === "Completed").length;
 
   const displayCalls = totalCalls;
   const displayConversations = totalConversations;

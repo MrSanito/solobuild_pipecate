@@ -8,7 +8,7 @@ export function AuthWrapper({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   
-  const isAuthPage = pathname === "/login2" || pathname === "/forget_password";
+  const isAuthPage = pathname === "/login2" || pathname === "/forgot-password";
 
   useEffect(() => {
     const token = sessionStorage.getItem("solobuild_token");

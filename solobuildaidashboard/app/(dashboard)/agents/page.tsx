@@ -126,7 +126,7 @@ export default function AgentsPage() {
     const trimmedPrompt = prompt.trim();
 
     if (!trimmedName || !trimmedAgentName || !trimmedOrgName) {
-      toast.error("Please fill in Name, Agent Name and Org Name.");
+      toast.error("Please fill in Agent Name (Display), Pipecat Agent ID and Org Name.");
       return;
     }
 

@@ -128,6 +128,21 @@ export function ProfileModal({ open, onClose, defaultTab = "general" }: ProfileM
       });
 
       if (response.ok) {
+        const updatedClient = await response.json();
+        // Sync back to sessionStorage
+        const userStr = sessionStorage.getItem("solobuild_user");
+        if (userStr) {
+          try {
+            const user = JSON.parse(userStr);
+            const clientSafe = {
+              ...user,
+              name: updatedClient.name || user.name,
+              email: updatedClient.email || user.email,
+            };
+            sessionStorage.setItem("solobuild_user", JSON.stringify(clientSafe));
+            window.dispatchEvent(new Event("solobuild_user_updated"));
+          } catch (e) {}
+        }
         toast.success(`${section} settings saved successfully!`);
         onClose();
       } else {

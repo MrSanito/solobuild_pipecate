@@ -1,44 +1,71 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
 import { Client } from "@/lib/models";
-import { auth } from "@clerk/nextjs/server";
+import { getAuthClient } from "@/lib/auth";
+
 // GET client settings
 export async function GET(req: Request) {
   try {
-    await dbConnect();
-
-    const { userId } = await auth();
-    if (!userId) {
+    let { client, isAuthenticated } = await getAuthClient(req, "+vobiz.authToken +geminiApiKey");
+    
+    if (!isAuthenticated) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Fetch the client with sensitive fields explicitly selected
-    let client = await Client.findOne({ clerkId: userId }).select("+vobiz.authToken +geminiApiKey");
-    
-    // Self-healing: If no client exists, create one from env vars (only for specific dev cases, better to just return 404 but keeping for compatibility)
+    // Self-healing: If no client exists, try to claim orphan or create new one
     if (!client) {
-      const envAuthId = process.env.VOBIZ_AUTH_ID || "";
-      const envAuthToken = process.env.VOBIZ_AUTH_TOKEN || "";
-      const envPhone = process.env.VOBIZ_PHONE_NUMBER || "";
-      const envGeminiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || "";
+      let userId: string | null = null;
+      try {
+        const { auth } = await import("@clerk/nextjs/server");
+        const authData = await auth();
+        userId = authData.userId;
+      } catch (e) {}
 
-      client = await Client.create({
-        clerkId: userId,
-        name: "Solobuild AI User",
-        slug: "solobuild-ai-user",
-        email: "placeholder@example.com",
-        passwordHash: "placeholder_hash_value",
-        vobiz: {
-          authId: envAuthId,
-          authToken: envAuthToken,
-          phoneNumber: envPhone,
-          encoding: "audio/x-mulaw",
-          sampleRate: 8000,
-          l16Endian: "le",
-        },
-        geminiApiKey: envGeminiKey,
-      });
-      console.log(`[SETTINGS] Created default client: ${client._id}`);
+      if (userId) {
+        // Step 1: claim any orphan placeholder document that has no clerkId yet
+        const orphan = await Client.findOneAndUpdate(
+          { clerkId: { $exists: false }, slug: "solobuild-ai-user" },
+          { $set: { clerkId: userId } },
+          { new: true }
+        ).select("+vobiz.authToken +geminiApiKey");
+
+        if (orphan) {
+          client = orphan;
+          console.log(`[SETTINGS] Claimed orphan client ${client._id} for clerkId ${userId}`);
+        } else {
+          // Step 2: no orphan — upsert a new client keyed by clerkId
+          const envAuthId = process.env.VOBIZ_AUTH_ID || "";
+          const envAuthToken = process.env.VOBIZ_AUTH_TOKEN || "";
+          const envPhone = process.env.VOBIZ_PHONE_NUMBER || "";
+          const envGeminiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || "";
+
+          client = await Client.findOneAndUpdate(
+            { clerkId: userId },
+            {
+              $setOnInsert: {
+                clerkId: userId,
+                name: "Solobuild AI User",
+                slug: `solobuild-ai-user-${userId.slice(-6)}`,
+                email: `${userId.slice(-8)}@placeholder.local`,
+                passwordHash: "placeholder_hash_value",
+                vobiz: {
+                  authId: envAuthId,
+                  authToken: envAuthToken,
+                  phoneNumber: envPhone,
+                  encoding: "audio/x-mulaw",
+                  sampleRate: 8000,
+                  l16Endian: "le",
+                },
+                geminiApiKey: envGeminiKey,
+              },
+            },
+            { upsert: true, new: true }
+          );
+          console.log(`[SETTINGS] Upserted default client: ${client?._id}`);
+        }
+      } else {
+        return NextResponse.json({ error: "Client database entry missing" }, { status: 404 });
+      }
     }
 
     return NextResponse.json(client);
@@ -54,21 +81,13 @@ export async function GET(req: Request) {
 // POST client settings updates
 export async function POST(req: Request) {
   try {
-    const { userId } = await auth();
-    if (!userId) {
+    const { client, isAuthenticated } = await getAuthClient(req, "+vobiz.authToken +geminiApiKey");
+    if (!isAuthenticated || !client) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await req.json();
     const { section, ...settings } = body;
-
-    await dbConnect();
-
-    let client = await Client.findOne({ clerkId: userId }).select("+vobiz.authToken +geminiApiKey");
-
-    if (!client) {
-      return NextResponse.json({ error: "Client not found" }, { status: 404 });
-    }
 
     if (section === "General") {
       if (settings.name !== undefined) client.name = settings.name;

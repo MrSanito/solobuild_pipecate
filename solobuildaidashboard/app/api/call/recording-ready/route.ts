@@ -74,11 +74,16 @@ export async function POST(req: Request) {
           callEntry.recordingId = recordingId;
           callEntry.recordingUri = recordUrl;
           callEntry.recordingCloudinaryUrl = cloudinaryUrl;
-          callEntry.callStatus = "completed";
-          callEntry.endedAt = new Date();
           
-          if (callEntry.startedAt) {
-            callEntry.durationSeconds = Math.round((new Date().getTime() - callEntry.startedAt.getTime()) / 1000);
+          // Preserve hangup metrics if they were already recorded by the hangup callback
+          if (!callEntry.endedAt) {
+            callEntry.endedAt = new Date();
+          }
+          if (!callEntry.durationSeconds && callEntry.startedAt) {
+            callEntry.durationSeconds = Math.round((callEntry.endedAt.getTime() - callEntry.startedAt.getTime()) / 1000);
+          }
+          if (!callEntry.callStatus || callEntry.callStatus === "initiated" || callEntry.callStatus === "ringing" || callEntry.callStatus === "answered") {
+            callEntry.callStatus = "completed";
           }
 
           // Gemini analysis integration

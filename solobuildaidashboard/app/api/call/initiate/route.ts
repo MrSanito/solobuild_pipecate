@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
-import { Client, Call, Agent } from "@/lib/models";
-import { verifyToken } from "@/lib/auth";
+import { Call, Agent } from "@/lib/models";
+import { getAuthClient } from "@/lib/auth";
 
 export async function POST(req: Request) {
   try {
@@ -13,25 +13,10 @@ export async function POST(req: Request) {
 
     const sanitizedPhone = phoneNumber.replace(/\s+/g, "");
 
-    await dbConnect();
-
-    const authHeader = req.headers.get("authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    const { client, isAuthenticated } = await getAuthClient(req, "+vobiz.authToken");
+    
+    if (!isAuthenticated || !client) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const token = authHeader.split(" ")[1];
-    const decoded = await verifyToken(token);
-    
-    if (!decoded) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-
-    const clientEmail = decoded.email;
-
-    const client = await Client.findOne({ email: clientEmail }).select("+vobiz.authToken");
-    
-    if (!client) {
-      return NextResponse.json({ error: "No client found" }, { status: 400 });
     }
 
     if (!client.vobiz || !client.vobiz.authId || !client.vobiz.authToken) {
@@ -53,6 +38,10 @@ export async function POST(req: Request) {
       ? `${process.env.PUBLIC_URL.replace(/\/$/, "")}/api/call/answer` 
       : `${proto}://${host}/api/call/answer`;
 
+    let hangupUrl = process.env.PUBLIC_URL 
+      ? `${process.env.PUBLIC_URL.replace(/\/$/, "")}/api/call/hangup` 
+      : `${proto}://${host}/api/call/hangup`;
+
     if (agentId) {
       const dbAgent = await Agent.findById(agentId);
       if (dbAgent) {
@@ -70,7 +59,7 @@ export async function POST(req: Request) {
       answerUrl += (answerUrl.includes('?') ? '&' : '?') + `customerNumber=${encodeURIComponent(customerNumber)}`;
     }
 
-    console.log(`[INITIATE] Triggering outbound Vobiz call. Target: ${sanitizedPhone}, Answer URL: ${answerUrl}`);
+    console.log(`[INITIATE] Triggering outbound Vobiz call. Target: ${sanitizedPhone}, Answer URL: ${answerUrl}, Hangup URL: ${hangupUrl}`);
 
     // Call the Vobiz REST API
     const vobizUrl = `https://api.vobiz.ai/api/v1/Account/${authId}/Call/`;
@@ -86,6 +75,10 @@ export async function POST(req: Request) {
         from: fromNumber,
         answer_url: answerUrl,
         answer_method: "POST",
+        hangup_url: hangupUrl,
+        hangup_method: "POST",
+        hangup_on_ring: 30,
+        time_limit: 3600,
       }),
     });
 
@@ -111,6 +104,9 @@ export async function POST(req: Request) {
         startedAt: new Date(),
       };
 
+      if (agentId) {
+        callData.agentId = agentId;
+      }
       if (campaignId) {
         callData.campaignId = campaignId;
       }

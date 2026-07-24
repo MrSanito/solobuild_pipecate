@@ -1,18 +1,14 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
-import { Campaign, Client, Agent } from "@/lib/models";
-import { auth } from "@clerk/nextjs/server";
+import { Campaign, Agent } from "@/lib/models";
+import { getAuthClient } from "@/lib/auth";
 
 export async function GET(req: Request) {
   try {
-    await dbConnect();
-    
-    const { userId } = await auth();
-    if (!userId) {
+    const { client, isAuthenticated } = await getAuthClient(req);
+    if (!isAuthenticated) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-
-    const client = await Client.findOne({ clerkId: userId });
     if (!client) {
       return NextResponse.json([]);
     }
@@ -49,16 +45,9 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    await dbConnect();
-    
-    const { userId } = await auth();
-    if (!userId) {
+    const { client, isAuthenticated } = await getAuthClient(req);
+    if (!isAuthenticated || !client) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const client = await Client.findOne({ clerkId: userId });
-    if (!client) {
-      return NextResponse.json({ error: "No client found" }, { status: 400 });
     }
 
     const body = await req.json();
