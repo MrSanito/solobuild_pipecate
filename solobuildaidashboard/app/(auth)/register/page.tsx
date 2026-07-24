@@ -45,20 +45,37 @@ export default function Page() {
 
   const handleVerify = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    if (!setActive) return;
     
     setVerifyError('')
     const formData = new FormData(e.currentTarget)
     const code = formData.get('code') as string
 
     try {
-      const completeSignUp = await signUp.attemptEmailAddressVerification({
-        code,
-      })
+      // Try the newer API first if available
+      let completeSignUp;
+      if (typeof signUp.attemptEmailAddressVerification === 'function') {
+        completeSignUp = await signUp.attemptEmailAddressVerification({ code })
+      } else {
+        // Fallback to the older API that was originally used
+        completeSignUp = await signUp.verifications.verifyEmailCode({ code })
+      }
       
       if (completeSignUp.status === 'complete') {
-        await setActive({ session: completeSignUp.createdSessionId })
-        router.push('/')
+        await signUp.finalize({
+          navigate: ({ session, decorateUrl }: any) => {
+            if (session?.currentTask) {
+              console.log(session?.currentTask)
+              return
+            }
+
+            const url = decorateUrl('/')
+            if (url.startsWith('http')) {
+              window.location.href = url
+            } else {
+              router.push(url)
+            }
+          },
+        })
       } else {
         console.error('Sign-up attempt not complete:', completeSignUp)
         setVerifyError('Sign-up attempt not complete. Please try again.')
@@ -66,23 +83,7 @@ export default function Page() {
     } catch (err: any) {
       console.error('Error verifying email:', err)
       const msg = err.errors?.[0]?.longMessage || err.errors?.[0]?.message || 'Invalid verification code'
-      
-      // If attemptEmailAddressVerification fails (maybe older version), try the older API
-      if (err.errors?.[0]?.code === 'method_not_allowed' || err instanceof TypeError) {
-        try {
-          const oldComplete = await (signUp as any).verifications.verifyEmailCode({ code })
-          if (oldComplete.status === 'complete') {
-            await setActive({ session: oldComplete.createdSessionId })
-            router.push('/')
-            return
-          }
-        } catch (innerErr: any) {
-          console.error('Old API verify failed:', innerErr)
-          setVerifyError(innerErr.errors?.[0]?.longMessage || 'Invalid verification code')
-        }
-      } else {
-        setVerifyError(msg)
-      }
+      setVerifyError(msg)
     }
   }
 
