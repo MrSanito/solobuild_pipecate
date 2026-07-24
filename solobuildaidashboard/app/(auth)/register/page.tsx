@@ -58,7 +58,7 @@ export default function Page() {
         if (setActive) {
           await setActive({ session: signUp.createdSessionId })
         }
-        router.push('/dashboard')
+        window.location.href = '/dashboard'
       } else {
         console.error('Sign-up attempt not complete:', signUp)
         setVerifyError('Sign-up attempt not complete. Please try again.')
@@ -72,9 +72,9 @@ export default function Page() {
 
   useEffect(() => {
     if (signUp.status === 'complete' || isSignedIn) {
-      router.push('/dashboard')
+      window.location.href = '/dashboard'
     }
-  }, [signUp.status, isSignedIn, router])
+  }, [signUp.status, isSignedIn])
 
   if (signUp.status === 'complete' || isSignedIn) {
     return null

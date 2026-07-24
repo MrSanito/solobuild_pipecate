@@ -37,11 +37,11 @@ export default function Page() {
             console.log(session?.currentTask)
             return
           }
-          const url = decorateUrl('/')
+          const url = decorateUrl('/dashboard')
           if (url.startsWith('http')) {
             window.location.href = url
           } else {
-            router.push(url)
+            window.location.href = url
           }
         },
       })
@@ -72,11 +72,11 @@ export default function Page() {
             console.log(session?.currentTask)
             return
           }
-          const url = decorateUrl('/')
+          const url = decorateUrl('/dashboard')
           if (url.startsWith('http')) {
             window.location.href = url
           } else {
-            router.push(url)
+            window.location.href = url
           }
         },
       })
@@ -87,9 +87,9 @@ export default function Page() {
 
   useEffect(() => {
     if (signIn.status === 'complete' || isSignedIn) {
-      router.push('/')
+      window.location.href = '/dashboard'
     }
-  }, [signIn.status, isSignedIn, router])
+  }, [signIn.status, isSignedIn])
 
   if (signIn.status === 'complete' || isSignedIn) {
     return null
