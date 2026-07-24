@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, ShieldCheck, RefreshCw } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 
 export default function Page() {
   const { signIn, errors, fetchStatus } = useSignIn()
@@ -41,7 +41,7 @@ export default function Page() {
           if (url.startsWith('http')) {
             window.location.href = url
           } else {
-            window.location.href = url
+            router.push(url)
           }
         },
       })
@@ -76,7 +76,7 @@ export default function Page() {
           if (url.startsWith('http')) {
             window.location.href = url
           } else {
-            window.location.href = url
+            router.push(url)
           }
         },
       })
@@ -85,11 +85,10 @@ export default function Page() {
     }
   }
 
-  useEffect(() => {
-    if (signIn.status === 'complete' || isSignedIn) {
-      window.location.href = '/dashboard'
-    }
-  }, [signIn.status, isSignedIn])
+  // Note: removed the separate useEffect that also redirected on
+  // signIn.status === 'complete' / isSignedIn — it was a second
+  // redirect path racing with finalize()'s navigate callback above.
+  // finalize() now owns the redirect exclusively.
 
   if (signIn.status === 'complete' || isSignedIn) {
     return null

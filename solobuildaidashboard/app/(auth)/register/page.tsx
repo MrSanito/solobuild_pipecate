@@ -7,13 +7,14 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, ShieldCheck, RefreshCw } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 
 export default function Page() {
-  const { signUp, setActive, errors, fetchStatus } = useSignUp() as any
+  const { signUp, errors, fetchStatus } = useSignUp()
   const { isSignedIn } = useAuth()
   const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
+  const [verifyError, setVerifyError] = useState('')
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -30,7 +31,6 @@ export default function Page() {
       lastName,
       unsafeMetadata: {
         role: "client"
-        
       }
     })
     if (error) {
@@ -41,24 +41,35 @@ export default function Page() {
     if (!error) await signUp.verifications.sendEmailCode()
   }
 
-  const [verifyError, setVerifyError] = useState('')
-
   const handleVerify = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    
+
     setVerifyError('')
     const formData = new FormData(e.currentTarget)
     const code = formData.get('code') as string
 
     try {
-      // Use the original verifyEmailCode which mutates the signUp object in place
-      await (signUp as any).verifications.verifyEmailCode({ code })
-      
+      await signUp.verifications.verifyEmailCode({ code })
+
       if (signUp.status === 'complete') {
-        if (setActive) {
-          await setActive({ session: signUp.createdSessionId })
-        }
-        window.location.href = '/dashboard'
+        // finalize() sets the active session AND handles navigation —
+        // this replaces the old setActive() + window.location.href pattern,
+        // which no longer works because useSignUp() doesn't return setActive
+        // in this version of Clerk.
+        await signUp.finalize({
+          navigate: ({ session, decorateUrl }) => {
+            if (session?.currentTask) {
+              console.log(session.currentTask)
+              return
+            }
+            const url = decorateUrl('/dashboard')
+            if (url.startsWith('http')) {
+              window.location.href = url
+            } else {
+              router.push(url)
+            }
+          },
+        })
       } else {
         console.error('Sign-up attempt not complete:', signUp)
         setVerifyError('Sign-up attempt not complete. Please try again.')
@@ -70,11 +81,10 @@ export default function Page() {
     }
   }
 
-  useEffect(() => {
-    if (signUp.status === 'complete' || isSignedIn) {
-      window.location.href = '/dashboard'
-    }
-  }, [signUp.status, isSignedIn])
+  // Note: the separate useEffect that used to also redirect on
+  // signUp.status === 'complete' / isSignedIn has been removed.
+  // signUp.finalize()'s navigate callback now owns the redirect,
+  // so there's only one code path doing it (no race condition).
 
   if (signUp.status === 'complete' || isSignedIn) {
     return null
