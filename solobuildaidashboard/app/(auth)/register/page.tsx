@@ -61,21 +61,10 @@ export default function Page() {
       }
       
       if (completeSignUp.status === 'complete') {
-        await signUp.finalize({
-          navigate: ({ session, decorateUrl }: any) => {
-            if (session?.currentTask) {
-              console.log(session?.currentTask)
-              return
-            }
-
-            const url = decorateUrl('/')
-            if (url.startsWith('http')) {
-              window.location.href = url
-            } else {
-              router.push(url)
-            }
-          },
-        })
+        if (setActive) {
+          await setActive({ session: completeSignUp.createdSessionId })
+        }
+        router.push('/')
       } else {
         console.error('Sign-up attempt not complete:', completeSignUp)
         setVerifyError('Sign-up attempt not complete. Please try again.')
