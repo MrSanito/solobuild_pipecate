@@ -61,9 +61,6 @@ export default function Page() {
           }
         },
       })
-
-      // Create user in our DB after Clerk session is active
-      await fetch('/api/users/create', { method: 'POST' })
     } else {
       console.error('Sign-up attempt not complete:', signUp)
     }
