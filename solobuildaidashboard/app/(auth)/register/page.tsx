@@ -15,7 +15,9 @@ export default function Page() {
   const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
 
-  const handleSubmit = async (formData: FormData) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    const formData = new FormData(e.currentTarget)
     const emailAddress = formData.get('email') as string
     const password = formData.get('password') as string
     const firstName = formData.get('firstName') as string
@@ -39,9 +41,14 @@ export default function Page() {
     if (!error) await signUp.verifications.sendEmailCode()
   }
 
-  const handleVerify = async (formData: FormData) => {
+  const [verifyError, setVerifyError] = useState('')
+
+  const handleVerify = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
     if (!setActive) return;
     
+    setVerifyError('')
+    const formData = new FormData(e.currentTarget)
     const code = formData.get('code') as string
 
     try {
@@ -54,9 +61,12 @@ export default function Page() {
         router.push('/')
       } else {
         console.error('Sign-up attempt not complete:', completeSignUp)
+        setVerifyError('Sign-up attempt not complete. Please try again.')
       }
     } catch (err: any) {
       console.error('Error verifying email:', err)
+      const msg = err.errors?.[0]?.longMessage || err.errors?.[0]?.message || 'Invalid verification code'
+      
       // If attemptEmailAddressVerification fails (maybe older version), try the older API
       if (err.errors?.[0]?.code === 'method_not_allowed' || err instanceof TypeError) {
         try {
@@ -64,10 +74,14 @@ export default function Page() {
           if (oldComplete.status === 'complete') {
             await setActive({ session: oldComplete.createdSessionId })
             router.push('/')
+            return
           }
-        } catch (innerErr) {
+        } catch (innerErr: any) {
           console.error('Old API verify failed:', innerErr)
+          setVerifyError(innerErr.errors?.[0]?.longMessage || 'Invalid verification code')
         }
+      } else {
+        setVerifyError(msg)
       }
     }
   }
@@ -113,13 +127,21 @@ export default function Page() {
             </div>
           </CardHeader>
 
-          <form action={handleVerify}>
+          <form onSubmit={handleVerify}>
             <CardContent className="space-y-5 px-6 pb-6">
               {/* Global errors */}
               {errors?.global && (
                 <div className="flex items-start gap-2.5 rounded-lg border border-red-500/30 bg-red-500/10 p-3.5 text-xs text-red-400">
                   <AlertCircle className="h-4 w-4 shrink-0 text-red-400 mt-0.5" />
                   <span className="leading-relaxed">{errors.global.map((e: any) => e.message).join('. ')}</span>
+                </div>
+              )}
+
+              {/* Verify API Error */}
+              {verifyError && (
+                <div className="flex items-start gap-2.5 rounded-lg border border-red-500/30 bg-red-500/10 p-3.5 text-xs text-red-400">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-red-400 mt-0.5" />
+                  <span className="leading-relaxed">{verifyError}</span>
                 </div>
               )}
 
@@ -134,7 +156,7 @@ export default function Page() {
                   placeholder="Enter 6-digit code"
                   autoComplete="one-time-code"
                   className={`h-11 border-neutral-800/80 bg-neutral-950/80 text-white rounded-lg text-sm text-center tracking-[0.3em] font-mono text-lg placeholder:text-neutral-600 placeholder:tracking-normal placeholder:font-sans placeholder:text-sm focus-visible:ring-1 transition-all duration-200 ${
-                    errors?.fields?.code
+                    errors?.fields?.code || verifyError
                       ? 'border-red-500/50 focus-visible:border-red-500/50 focus-visible:ring-red-500/30'
                       : 'focus-visible:border-indigo-500/50 focus-visible:ring-indigo-500/30'
                   }`}
@@ -210,7 +232,7 @@ export default function Page() {
           </div>
         </CardHeader>
 
-        <form action={handleSubmit}>
+        <form onSubmit={handleSubmit}>
           <CardContent className="space-y-5 px-6 pb-6">
             {/* Global errors banner */}
             {errors?.global && errors.global.length > 0 && (
