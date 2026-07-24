@@ -10,7 +10,7 @@ import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, ShieldCheck, RefreshCw }
 import { useState, useEffect } from 'react'
 
 export default function Page() {
-  const { signUp, errors, fetchStatus } = useSignUp()
+  const { signUp, setActive, errors, fetchStatus } = useSignUp() as any
   const { isSignedIn } = useAuth()
   const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
@@ -40,29 +40,35 @@ export default function Page() {
   }
 
   const handleVerify = async (formData: FormData) => {
+    if (!setActive) return;
+    
     const code = formData.get('code') as string
 
-    await signUp.verifications.verifyEmailCode({
-      code,
-    })
-    if (signUp.status === 'complete') {
-      await signUp.finalize({
-        navigate: ({ session, decorateUrl }) => {
-          if (session?.currentTask) {
-            console.log(session?.currentTask)
-            return
-          }
-
-          const url = decorateUrl('/')
-          if (url.startsWith('http')) {
-            window.location.href = url
-          } else {
-            router.push(url)
-          }
-        },
+    try {
+      const completeSignUp = await signUp.attemptEmailAddressVerification({
+        code,
       })
-    } else {
-      console.error('Sign-up attempt not complete:', signUp)
+      
+      if (completeSignUp.status === 'complete') {
+        await setActive({ session: completeSignUp.createdSessionId })
+        router.push('/')
+      } else {
+        console.error('Sign-up attempt not complete:', completeSignUp)
+      }
+    } catch (err: any) {
+      console.error('Error verifying email:', err)
+      // If attemptEmailAddressVerification fails (maybe older version), try the older API
+      if (err.errors?.[0]?.code === 'method_not_allowed' || err instanceof TypeError) {
+        try {
+          const oldComplete = await (signUp as any).verifications.verifyEmailCode({ code })
+          if (oldComplete.status === 'complete') {
+            await setActive({ session: oldComplete.createdSessionId })
+            router.push('/')
+          }
+        } catch (innerErr) {
+          console.error('Old API verify failed:', innerErr)
+        }
+      }
     }
   }
 
