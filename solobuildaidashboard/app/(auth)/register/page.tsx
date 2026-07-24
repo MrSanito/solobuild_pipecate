@@ -51,22 +51,16 @@ export default function Page() {
     const code = formData.get('code') as string
 
     try {
-      // Try the newer API first if available
-      let completeSignUp;
-      if (typeof signUp.attemptEmailAddressVerification === 'function') {
-        completeSignUp = await signUp.attemptEmailAddressVerification({ code })
-      } else {
-        // Fallback to the older API that was originally used
-        completeSignUp = await signUp.verifications.verifyEmailCode({ code })
-      }
+      // Use the original verifyEmailCode which mutates the signUp object in place
+      await (signUp as any).verifications.verifyEmailCode({ code })
       
-      if (completeSignUp.status === 'complete') {
+      if (signUp.status === 'complete') {
         if (setActive) {
-          await setActive({ session: completeSignUp.createdSessionId })
+          await setActive({ session: signUp.createdSessionId })
         }
         router.push('/dashboard')
       } else {
-        console.error('Sign-up attempt not complete:', completeSignUp)
+        console.error('Sign-up attempt not complete:', signUp)
         setVerifyError('Sign-up attempt not complete. Please try again.')
       }
     } catch (err: any) {

@@ -15,7 +15,9 @@ export default function Page() {
   const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
 
-  const handleSubmit = async (formData: FormData) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    const formData = new FormData(e.currentTarget)
     const emailAddress = formData.get('email') as string
     const password = formData.get('password') as string
 
@@ -56,7 +58,9 @@ export default function Page() {
     }
   }
 
-  const handleVerify = async (formData: FormData) => {
+  const handleVerify = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    const formData = new FormData(e.currentTarget)
     const code = formData.get('code') as string
 
     await signIn.mfa.verifyEmailCode({ code })
@@ -118,7 +122,7 @@ export default function Page() {
             </div>
           </CardHeader>
 
-          <form action={handleVerify}>
+          <form onSubmit={handleVerify}>
             <CardContent className="space-y-5 px-6 pb-6">
               {/* Global errors */}
               {errors?.global && errors.global.length > 0 && (
@@ -223,7 +227,7 @@ export default function Page() {
           </div>
         </CardHeader>
 
-        <form action={handleSubmit}>
+        <form onSubmit={handleSubmit}>
           <CardContent className="space-y-5 px-6 pb-6">
             {/* Global errors banner */}
             {errors?.global && errors.global.length > 0 && (
