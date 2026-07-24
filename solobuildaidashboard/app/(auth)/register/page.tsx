@@ -64,7 +64,7 @@ export default function Page() {
         if (setActive) {
           await setActive({ session: completeSignUp.createdSessionId })
         }
-        router.push('/')
+        router.push('/dashboard')
       } else {
         console.error('Sign-up attempt not complete:', completeSignUp)
         setVerifyError('Sign-up attempt not complete. Please try again.')
@@ -78,7 +78,7 @@ export default function Page() {
 
   useEffect(() => {
     if (signUp.status === 'complete' || isSignedIn) {
-      router.push('/')
+      router.push('/dashboard')
     }
   }, [signUp.status, isSignedIn, router])
 
