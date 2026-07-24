@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { fetchWithAuth } from "@/lib/api";
 import { Bell, Search, Plus } from "lucide-react";
 import { ProfileModal } from "@/components/modals/profile-modal";
+import { useClerk } from "@clerk/nextjs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,6 +28,7 @@ const pageTitles: Record<string, { title: string; subtitle: string }> = {
 export function Navbar() {
   const pathname = usePathname();
   const page = pageTitles[pathname] || pageTitles["/"];
+  const { signOut } = useClerk();
   
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [profileDefaultTab, setProfileDefaultTab] = useState<"general" | "vobiz" | "gemini">("general");
@@ -138,7 +140,7 @@ export function Navbar() {
               className="text-red-600 cursor-pointer"
               onSelect={() => {
                 sessionStorage.clear();
-                window.location.reload();
+                signOut({ redirectUrl: '/' });
               }}
             >
               Log out

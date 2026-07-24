@@ -112,15 +112,17 @@ const VobizConfigSchema = new Schema<IVobizConfig>(
 );
 
 export interface IClient extends Document {
+  clerkId?: string;
   name: string;
   slug: string;
   email: string;
-  passwordHash: string;
+  passwordHash?: string;
   phone?: string;
   timezone?: string;
-  plan: 'trial' | 'starter' | 'pro';
+  plan: 'free' | 'trial' | 'starter' | 'pro';
+  credits: number;
   isActive: boolean;
-  vobiz: IVobizConfig;
+  vobiz?: IVobizConfig;
   geminiApiKey?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -128,15 +130,17 @@ export interface IClient extends Document {
 
 const ClientSchema = new Schema<IClient>(
   {
+    clerkId: { type: String, unique: true, sparse: true, index: true },
     name: { type: String, required: true },
     slug: { type: String, required: true, unique: true, lowercase: true },
     email: { type: String, required: true, unique: true, lowercase: true },
-    passwordHash: { type: String, required: true, select: false },
+    passwordHash: { type: String, select: false },
     phone: { type: String },
     timezone: { type: String, default: 'Asia/Kolkata' },
-    plan: { type: String, enum: ['trial', 'starter', 'pro'], default: 'trial' },
+    plan: { type: String, enum: ['free', 'trial', 'starter', 'pro'], default: 'free' },
+    credits: { type: Number, default: 0 },
     isActive: { type: Boolean, default: true },
-    vobiz: { type: VobizConfigSchema, required: true },
+    vobiz: { type: VobizConfigSchema },
     geminiApiKey: { type: String, select: false },
   },
   { timestamps: true }
@@ -335,3 +339,5 @@ CallSchema.index({ campaignId: 1, createdAt: -1 });
 CallSchema.index({ contactId: 1, createdAt: -1 });
 
 export const Call: Model<ICall> = mongoose.models.Call || model<ICall>('Call', CallSchema);
+
+

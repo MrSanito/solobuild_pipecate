@@ -55,7 +55,7 @@ export default function ForgetPasswordPage() {
               </Button>
               <div className="text-xs text-center text-neutral-400">
                 Remember your password?{" "}
-                <Link href="/login" className="text-indigo-400 hover:text-indigo-300 transition-colors">
+                <Link href="/login2" className="text-indigo-400 hover:text-indigo-300 transition-colors">
                   Sign in
                 </Link>
               </div>
@@ -70,7 +70,7 @@ export default function ForgetPasswordPage() {
             </CardContent>
             <CardFooter>
               <Button variant="outline" className="w-full h-10 border-neutral-700 text-white hover:bg-neutral-800" asChild>
-                <Link href="/login">Back to Sign In</Link>
+                <Link href="/login2">Back to Sign In</Link>
               </Button>
             </CardFooter>
           </>

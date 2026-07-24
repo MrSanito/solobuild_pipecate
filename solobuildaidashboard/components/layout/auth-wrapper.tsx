@@ -8,7 +8,7 @@ export function AuthWrapper({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   
-  const isAuthPage = pathname === "/login" || pathname === "/forget_password";
+  const isAuthPage = pathname === "/login2" || pathname === "/forget_password";
 
   useEffect(() => {
     const token = sessionStorage.getItem("solobuild_token");
@@ -44,7 +44,7 @@ export function AuthWrapper({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (isAuthenticated === false && !isAuthPage) {
-      router.push("/login");
+      router.push("/login2");
     } else if (isAuthenticated === true && isAuthPage) {
       router.push("/");
     }

@@ -20,7 +20,7 @@ export async function POST(req: Request) {
     }
 
     // Verify current password
-    const isMatch = await bcrypt.compare(currentPassword, client.passwordHash);
+    const isMatch = await bcrypt.compare(currentPassword, client.passwordHash || "");
     if (!isMatch) {
       return NextResponse.json({ error: "Current password is incorrect" }, { status: 401 });
     }

@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthWrapper } from "@/components/layout/auth-wrapper";
 import { Toaster } from "react-hot-toast";
+import { ClerkProvider } from "@clerk/nextjs";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -43,9 +44,11 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.className} antialiased`}>
-        <AuthWrapper>
+        <ClerkProvider>
+          {/* <AuthWrapper> */}
           {children}
-        </AuthWrapper>
+          {/* </AuthWrapper> */}
+        </ClerkProvider>
         <Toaster position="top-right" />
       </body>
     </html>

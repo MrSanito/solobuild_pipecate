@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     }
 
     // Verify password
-    const isMatch = await bcrypt.compare(password, client.passwordHash);
+    const isMatch = await bcrypt.compare(password, client.passwordHash || "");
     if (!isMatch) {
       return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
     }

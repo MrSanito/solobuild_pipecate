@@ -1,19 +1,19 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
 import { Client } from "@/lib/models";
-
+import { auth } from "@clerk/nextjs/server";
 // GET client settings
 export async function GET(req: Request) {
   try {
     await dbConnect();
 
-    const clientEmail = req.headers.get("x-client-email");
-    if (!clientEmail) {
+    const { userId } = await auth();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Fetch the client with sensitive fields explicitly selected
-    let client = await Client.findOne({ email: clientEmail }).select("+vobiz.authToken +geminiApiKey");
+    let client = await Client.findOne({ clerkId: userId }).select("+vobiz.authToken +geminiApiKey");
     
     // Self-healing: If no client exists, create one from env vars (only for specific dev cases, better to just return 404 but keeping for compatibility)
     if (!client) {
@@ -23,9 +23,10 @@ export async function GET(req: Request) {
       const envGeminiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || "";
 
       client = await Client.create({
+        clerkId: userId,
         name: "Solobuild AI User",
         slug: "solobuild-ai-user",
-        email: clientEmail,
+        email: "placeholder@example.com",
         passwordHash: "placeholder_hash_value",
         vobiz: {
           authId: envAuthId,
@@ -53,8 +54,8 @@ export async function GET(req: Request) {
 // POST client settings updates
 export async function POST(req: Request) {
   try {
-    const clientEmail = req.headers.get("x-client-email");
-    if (!clientEmail) {
+    const { userId } = await auth();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -63,7 +64,7 @@ export async function POST(req: Request) {
 
     await dbConnect();
 
-    let client = await Client.findOne({ email: clientEmail }).select("+vobiz.authToken +geminiApiKey");
+    let client = await Client.findOne({ clerkId: userId }).select("+vobiz.authToken +geminiApiKey");
 
     if (!client) {
       return NextResponse.json({ error: "Client not found" }, { status: 404 });

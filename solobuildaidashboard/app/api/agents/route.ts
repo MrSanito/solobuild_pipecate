@@ -1,26 +1,18 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
 import { Agent, Client } from "@/lib/models";
-import { verifyToken } from "@/lib/auth";
+import { auth } from "@clerk/nextjs/server";
 
 export async function GET(req: Request) {
   try {
     await dbConnect();
     
-    const authHeader = req.headers.get("authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    const { userId } = await auth();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const token = authHeader.split(" ")[1];
-    const decoded = await verifyToken(token);
-    
-    if (!decoded) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
 
-    const clientEmail = decoded.email;
-
-    const client = await Client.findOne({ email: clientEmail });
+    const client = await Client.findOne({ clerkId: userId });
     
     if (!client) {
       return NextResponse.json([]);
@@ -73,20 +65,14 @@ export async function POST(req: Request) {
   try {
     await dbConnect();
     
-    const authHeader = req.headers.get("authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    const { userId } = await auth();
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const token = authHeader.split(" ")[1];
-    const decoded = await verifyToken(token);
-    
-    if (!decoded) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
 
-    const clientEmail = decoded.email;
+    const client = await Client.findOne({ clerkId: userId });
 
-    const client = await Client.findOne({ email: clientEmail });
+
     
     if (!client) {
       return NextResponse.json({ error: "No client found" }, { status: 400 });
